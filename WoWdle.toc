@@ -1,0 +1,8 @@
+## Interface: 120001
+## Title: WoWdle
+## Notes: A WoW-themed Wordle game. Type /wordle to play!
+## Author: You
+## Version: 1.0
+## SavedVariables: WoWdleSavedData
+
+WoWdle.lua
