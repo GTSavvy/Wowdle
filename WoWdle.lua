@@ -100,7 +100,9 @@ local function dailyIndex(stamp)
 end
 
 local function getDailyWord()
-    return WORDS[dailyIndex(todayStamp())]
+    local pool = activePool()
+    local h    = (todayStamp() * 2654435761) % (2^32)
+    return pool[(h % #pool) + 1]
 end
 
 local function dailyAlreadyCompleted()
@@ -194,6 +196,12 @@ local OPTION_DEFS = {
         label   = "Hard Mode",
         desc    = "All revealed hints must be used in subsequent guesses.",
     },
+    {
+        key     = "sixLetterWords",
+        default = true,
+        label   = "6-Letter Words",
+        desc    = "Include 6-letter words in the answer pool.",
+    },
 }
 
 local function getOptions()
@@ -285,8 +293,24 @@ local COLOR_TEXT    = {1, 1, 1}
 -- ============================================================
 -- HELPERS
 -- ============================================================
+
+-- Returns the subset of WORDS that matches current options.
+-- Called at game-start so toggling between games takes effect immediately.
+local function activePool()
+    if getOptions().sixLetterWords then
+        return WORDS   -- full pool, no filtering needed
+    end
+    -- Build a 5-only list. Cache it to avoid rebuilding on every call.
+    local pool = {}
+    for _, w in ipairs(WORDS) do
+        if #w == 5 then table.insert(pool, w) end
+    end
+    return pool
+end
+
 local function randomWord()
-    return WORDS[math.random(1, #WORDS)]
+    local pool = activePool()
+    return pool[math.random(1, #pool)]
 end
 
 local function scoreGuess(guess, answer)
@@ -974,7 +998,8 @@ local function BuildUI()
 
             local function refreshCB()
                 local val    = getOptions()[optKey]
-                local locked = (optKey == "hardMode") and (#state.guesses > 0)
+                local locked = (optKey == "hardMode" or optKey == "sixLetterWords")
+                               and (#state.guesses > 0)
                                and not (state.won or state.lost)
                 cb:SetChecked(val)
                 if locked then
