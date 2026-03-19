@@ -4,46 +4,24 @@
 local addonName, addon = ...
 
 -- ============================================================
--- WORD LIST (WoW-themed 5-letter words)
+-- WORD LIST
+-- Loaded from WoWdle_Words5.lua and WoWdle_Words6.lua.
+-- Both files must be listed before this one in the .toc.
+-- Words of both lengths are merged into one flat pool.
+-- Each game picks randomly from the full pool; the UI resizes
+-- to match whatever length is drawn.
 -- ============================================================
-local WORD_LIST = {
-    "GNOME", "DWARF", "TROLL", "TAUREN", "DRUID",
-    "ROGUE", "MAGE", "PRIEST", "SHAMAN", "PALADIN",
-    "WARLOCK", "HUNTER", "WARRIOR",
-    "STABS", "FROST", "ARCANE", "DEATH", "DEMON",
-    "FERAL", "RESTO", "HAVOC", "BLOOD",
-    "ORGRIMMAR", "IRONFORGE", "STORMWIND", "UNDERCITY",
-    "THUNDER", "SILVERMOON", "DARNASSUS",
-    -- Filtered to exactly 5 letters:
-    "GNOME", "DWARF", "TROLL", "DRUID", "ROGUE",
-    "FROST", "DEATH", "DEMON", "FERAL", "RESTO",
-    "HAVOC", "BLOOD", "NIGHT", "AZERITE", "THRALL",
-    "JAINA", "VELEN", "GARROSH", "SYLVANAS",
-    "ARENA", "RAID", "DUNGEON",
-    -- Strictly 5-letter WoW words:
-    "GNOME", "DWARF", "TROLL", "DRUID", "ROGUE",
-    "FROST", "DEATH", "FERAL", "BLOOD", "NIGHT",
-    "ARENA", "TALON", "CRYPT", "PLAGUED", "CURSE",
-    "ALTAR", "GOLEM", "DRAKE", "WYRM", "RUNE",
-    "QUEST", "LOOT", "SHARD", "TOTEM", "SIGIL",
-    "NEXUS", "VAULT", "FORGE", "ANVIL", "EMBER",
-    "STORM", "FLAME", "BLADE", "SHIELD", "SPEAR",
-    "ARROW", "STAFF", "CLOAK", "RINGS", "BOOTS",
-    "CHEST", "HEALS", "MAGIC", "POWER", "FOCUS",
-    "RANGE", "MELEE", "TANK", "BANISH", "CHARM",
-    "GLYPH", "ELUNE", "KHAZ", "LIGHT", "GRACE",
-    "HONOR", "VALOR", "BADGE", "TOKEN", "CREST",
-    "BEAST", "DEMON", "HAVOC", "RESTO", "BEARS",
-    "HORDE", "REALM", "GUILD", "RAID", "PATCH",
-}
 
--- Deduplicate and filter to exactly 5 letters
-local function buildWordList()
-    local seen = {}
-    local clean = {}
-    for _, w in ipairs(WORD_LIST) do
+local function loadAndValidate(letterCount)
+    local source = WoWdle_Words and WoWdle_Words[letterCount]
+    if not source then
+        error("WoWdle: WoWdle_Words[" .. letterCount .. "] not found. "
+              .. "Check your .toc load order.")
+    end
+    local seen, clean = {}, {}
+    for _, w in ipairs(source) do
         w = w:upper()
-        if #w == 5 and not seen[w] then
+        if #w == letterCount and not seen[w] then
             seen[w] = true
             table.insert(clean, w)
         end
@@ -51,37 +29,117 @@ local function buildWordList()
     return clean
 end
 
-local WORDS = buildWordList()
+-- Single flat list containing all 5- and 6-letter words.
+local WORDS = (function()
+    local pool = {}
+    for _, w in ipairs(loadAndValidate(5)) do table.insert(pool, w) end
+    for _, w in ipairs(loadAndValidate(6)) do table.insert(pool, w) end
+    return pool
+end)()
+
+-- ============================================================
+-- SAVED VARIABLES  (declare in .toc: ## SavedVariables: WoWdle_SavedVars)
+-- ============================================================
+WoWdle_SavedVars = WoWdle_SavedVars or {}
+
+-- ============================================================
+-- DAILY WORD HELPERS
+-- ============================================================
+
+local function todayStamp()
+    local t = date("*t")
+    return t.year * 10000 + t.month * 100 + t.day
+end
+
+local function dailyIndex(stamp)
+    local h = (stamp * 2654435761) % (2^32)
+    return (h % #WORDS) + 1
+end
+
+local function getDailyWord()
+    return WORDS[dailyIndex(todayStamp())]
+end
+
+local function dailyAlreadyCompleted()
+    return WoWdle_SavedVars.lastCompletedDate == todayStamp()
+end
+
+local function markDailyCompleted()
+    WoWdle_SavedVars.lastCompletedDate = todayStamp()
+end
+
+-- ============================================================
+-- ACTIVE WORD LENGTH  (derived from state.answer, never set manually)
+-- ============================================================
+local WORD_LENGTH = 5   -- updated by applyWord() before any UI call
+
+local function applyWord(word)
+    -- Set the answer and sync WORD_LENGTH from it.
+    -- Must be called before resetBoard() or rebuildGrid().
+    WORD_LENGTH = #word
+    return word
+end
 
 -- ============================================================
 -- STATE
 -- ============================================================
 local state = {
-    active = false,
-    answer = "",
-    guesses = {},      -- list of guess strings
+    answer       = "",
+    guesses      = {},
     currentInput = "",
-    maxGuesses = 6,
-    won = false,
-    lost = false,
+    maxGuesses   = 6,
+    won          = false,
+    lost         = false,
+    isDaily      = false,
 }
 
 -- ============================================================
--- FRAME REFERENCES (populated in BuildUI)
+-- FRAME REFERENCES
 -- ============================================================
-local MainFrame, InputBox
-local TileFrames = {}   -- TileFrames[row][col]
-local KeyButtons = {}   -- KeyButtons["A"] = button
+local MainFrame, InputBox, GridFrame
+local TileFrames = {}
+local KeyButtons = {}
+
+-- ============================================================
+-- LAYOUT
+-- ============================================================
+local FRAME_PADDING = 20
+local MAX_GRID_W    = 300
+local TILE_GAP      = 6
+local NUM_ROWS      = 6
+local KEY_W         = 28
+local KEY_H         = 32
+
+local function tileSize(len)
+    return math.floor((MAX_GRID_W - (len - 1) * TILE_GAP) / len)
+end
+
+local function gridWidth(len)
+    local ts = tileSize(len)
+    return len * ts + (len - 1) * TILE_GAP
+end
+
+local function gridHeight(len)
+    local ts = tileSize(len)
+    return NUM_ROWS * ts + (NUM_ROWS - 1) * TILE_GAP
+end
+
+local function frameWidth(len)
+    return gridWidth(len) + FRAME_PADDING * 2
+end
+
+local function frameHeight(len)
+    return gridHeight(len) + 30 + (KEY_H + 5) * 3 + 60 + 40
+end
 
 -- ============================================================
 -- COLORS
 -- ============================================================
-local COLOR_CORRECT  = {0.18, 0.65, 0.35, 1}   -- green
-local COLOR_PRESENT  = {0.75, 0.60, 0.10, 1}   -- yellow
-local COLOR_ABSENT   = {0.28, 0.28, 0.28, 1}   -- dark gray
-local COLOR_EMPTY    = {0.10, 0.10, 0.10, 1}   -- near black
-local COLOR_ACTIVE   = {0.30, 0.30, 0.35, 1}   -- slightly lit for current row
-local COLOR_TEXT     = {1, 1, 1}
+local COLOR_CORRECT = {0.18, 0.65, 0.35, 1}
+local COLOR_PRESENT = {0.75, 0.60, 0.10, 1}
+local COLOR_ABSENT  = {0.28, 0.28, 0.28, 1}
+local COLOR_EMPTY   = {0.10, 0.10, 0.10, 1}
+local COLOR_TEXT    = {1, 1, 1}
 
 -- ============================================================
 -- HELPERS
@@ -91,32 +149,27 @@ local function randomWord()
 end
 
 local function scoreGuess(guess, answer)
-    -- Returns table of "correct"/"present"/"absent" for each position
-    local result = {"absent","absent","absent","absent","absent"}
-    local answerCounts = {}
-
-    -- First pass: mark correct
-    for i = 1, 5 do
-        local g = guess:sub(i,i)
-        local a = answer:sub(i,i)
-        if g == a then
+    local len    = #answer
+    local result = {}
+    for i = 1, len do result[i] = "absent" end
+    local counts = {}
+    for i = 1, len do
+        if guess:sub(i,i) == answer:sub(i,i) then
             result[i] = "correct"
         else
-            answerCounts[a] = (answerCounts[a] or 0) + 1
+            local a = answer:sub(i,i)
+            counts[a] = (counts[a] or 0) + 1
         end
     end
-
-    -- Second pass: mark present
-    for i = 1, 5 do
+    for i = 1, len do
         if result[i] ~= "correct" then
             local g = guess:sub(i,i)
-            if answerCounts[g] and answerCounts[g] > 0 then
+            if counts[g] and counts[g] > 0 then
                 result[i] = "present"
-                answerCounts[g] = answerCounts[g] - 1
+                counts[g] = counts[g] - 1
             end
         end
     end
-
     return result
 end
 
@@ -125,136 +178,47 @@ local function setTileColor(tile, r, g, b)
 end
 
 local function updateTile(row, col, letter, status)
-    local tile = TileFrames[row][col]
+    local tile = TileFrames[row] and TileFrames[row][col]
+    if not tile then return end
     tile.text:SetText(letter or "")
-    if status == "correct" then
-        setTileColor(tile, unpack(COLOR_CORRECT))
-    elseif status == "present" then
-        setTileColor(tile, unpack(COLOR_PRESENT))
-    elseif status == "absent" then
-        setTileColor(tile, unpack(COLOR_ABSENT))
-    else
-        -- empty or active
-        setTileColor(tile, unpack(COLOR_EMPTY))
+    if     status == "correct" then setTileColor(tile, unpack(COLOR_CORRECT))
+    elseif status == "present" then setTileColor(tile, unpack(COLOR_PRESENT))
+    elseif status == "absent"  then setTileColor(tile, unpack(COLOR_ABSENT))
+    else                            setTileColor(tile, unpack(COLOR_EMPTY))
     end
 end
 
 local function updateCurrentRowDisplay()
     local row = #state.guesses + 1
     if row > state.maxGuesses then return end
-    for col = 1, 5 do
-        local letter = state.currentInput:sub(col, col)
-        updateTile(row, col, letter, nil)
+    for col = 1, WORD_LENGTH do
+        updateTile(row, col, state.currentInput:sub(col, col), nil)
     end
 end
 
 local function updateKeyboard(letter, status)
     local btn = KeyButtons[letter]
     if not btn then return end
-
-    -- Priority: correct > present > absent
     local current = btn.status
     if current == "correct" then return end
     if status == "correct" then
-        btn.bg:SetColorTexture(unpack(COLOR_CORRECT))
-        btn.status = "correct"
+        btn.bg:SetColorTexture(unpack(COLOR_CORRECT)); btn.status = "correct"
     elseif status == "present" and current ~= "correct" then
-        btn.bg:SetColorTexture(unpack(COLOR_PRESENT))
-        btn.status = "present"
+        btn.bg:SetColorTexture(unpack(COLOR_PRESENT)); btn.status = "present"
     elseif status == "absent" and not current then
-        btn.bg:SetColorTexture(unpack(COLOR_ABSENT))
-        btn.status = "absent"
+        btn.bg:SetColorTexture(unpack(COLOR_ABSENT));  btn.status = "absent"
     end
 end
 
 -- ============================================================
--- GAME LOGIC
+-- TILE CREATION
 -- ============================================================
-local function startNewGame()
-    state.answer = randomWord()
-    state.guesses = {}
-    state.currentInput = ""
-    state.won = false
-    state.lost = false
-
-    -- Reset tiles
-    for row = 1, 6 do
-        for col = 1, 5 do
-            updateTile(row, col, "", nil)
-        end
-    end
-
-    -- Reset keyboard colors
-    for letter, btn in pairs(KeyButtons) do
-        btn.bg:SetColorTexture(0.20, 0.20, 0.25)
-        btn.status = nil
-    end
-
-    -- Clear message
-    if MainFrame.msgText then
-        MainFrame.msgText:SetText("")
-    end
-
-    InputBox:SetText("")
-    InputBox:SetFocus()
-end
-
-local function submitGuess()
-    if state.won or state.lost then return end
-
-    local guess = state.currentInput:upper()
-
-    if #guess ~= 5 then
-        MainFrame.msgText:SetText("|cffff4444Not enough letters!|r")
-        return
-    end
-
-    -- Validate it's in word list (optional - allow any 5 letters for fun)
-    -- Score the guess
-    local row = #state.guesses + 1
-    local result = scoreGuess(guess, state.answer)
-
-    -- Reveal tiles
-    for col = 1, 5 do
-        updateTile(row, col, guess:sub(col,col), result[col])
-        updateKeyboard(guess:sub(col,col), result[col])
-    end
-
-    table.insert(state.guesses, guess)
-    state.currentInput = ""
-    InputBox:SetText("")
-
-    -- Check win
-    local allCorrect = true
-    for _, r in ipairs(result) do
-        if r ~= "correct" then allCorrect = false; break end
-    end
-
-    if allCorrect then
-        state.won = true
-        MainFrame.msgText:SetText("|cff00ff7fFor the Horde! You got it!|r")
-    elseif #state.guesses >= state.maxGuesses then
-        state.lost = true
-        MainFrame.msgText:SetText("|cffff4444Defeated! The word was: |cffffcc00" .. state.answer .. "|r")
-    end
-end
-
--- ============================================================
--- UI BUILDER
--- ============================================================
-local TILE_SIZE = 46
-local TILE_GAP  = 6
-local KEY_W     = 28
-local KEY_H     = 32
-
-local function createTile(parent, row, col)
+local function createTile(parent, row, col, ts)
     local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    local x = (col - 1) * (TILE_SIZE + TILE_GAP)
-    local y = -(row - 1) * (TILE_SIZE + TILE_GAP)
-    f:SetSize(TILE_SIZE, TILE_SIZE)
-    f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-
-    -- Outer border frame
+    f:SetSize(ts, ts)
+    f:SetPoint("TOPLEFT", parent, "TOPLEFT",
+               (col - 1) * (ts + TILE_GAP),
+               -(row - 1) * (ts + TILE_GAP))
     f:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -262,16 +226,16 @@ local function createTile(parent, row, col)
     })
     f:SetBackdropColor(0.4, 0.4, 0.45, 1)
 
-    -- Inner colored frame (inset 1px for border effect)
     local inner = CreateFrame("Frame", nil, f, "BackdropTemplate")
-    inner:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
-    inner:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
+    inner:SetPoint("TOPLEFT",     f, "TOPLEFT",      1, -1)
+    inner:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1,  1)
     inner:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
     inner:SetBackdropColor(unpack(COLOR_EMPTY))
     inner:SetBackdropBorderColor(0, 0, 0, 0)
     f.inner = inner
 
-    f.text = inner:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local fontObj = (ts < 44) and "GameFontNormal" or "GameFontNormalLarge"
+    f.text = inner:CreateFontString(nil, "OVERLAY", fontObj)
     f.text:SetAllPoints()
     f.text:SetJustifyH("CENTER")
     f.text:SetJustifyV("MIDDLE")
@@ -280,32 +244,176 @@ local function createTile(parent, row, col)
     return f
 end
 
+-- ============================================================
+-- GRID REBUILD  (called after applyWord() sets WORD_LENGTH)
+-- ============================================================
+local function rebuildGrid()
+    local len = WORD_LENGTH
+    local ts  = tileSize(len)
+
+    MainFrame:SetSize(frameWidth(len), frameHeight(len))
+
+    -- Destroy old tiles
+    for row = 1, NUM_ROWS do
+        if TileFrames[row] then
+            for col = 1, 6 do
+                if TileFrames[row][col] then
+                    TileFrames[row][col]:Hide()
+                    TileFrames[row][col] = nil
+                end
+            end
+        end
+        TileFrames[row] = {}
+    end
+
+    GridFrame:SetSize(gridWidth(len), gridHeight(len))
+
+    for row = 1, NUM_ROWS do
+        for col = 1, len do
+            TileFrames[row][col] = createTile(GridFrame, row, col, ts)
+        end
+    end
+
+    if InputBox then
+        InputBox:SetMaxLetters(len)
+    end
+end
+
+-- ============================================================
+-- GAME LOGIC
+-- ============================================================
+local function resetBoard()
+    state.guesses      = {}
+    state.currentInput = ""
+    state.won          = false
+    state.lost         = false
+
+    for row = 1, NUM_ROWS do
+        for col = 1, WORD_LENGTH do
+            updateTile(row, col, "", nil)
+        end
+    end
+    for _, btn in pairs(KeyButtons) do
+        btn.bg:SetColorTexture(0.20, 0.20, 0.25)
+        btn.status = nil
+    end
+    if MainFrame and MainFrame.msgText then
+        MainFrame.msgText:SetText("")
+    end
+    if InputBox then
+        InputBox:SetText("")
+        InputBox:SetFocus()
+    end
+end
+
+local function startDailyGame()
+    state.answer  = applyWord(getDailyWord())
+    state.isDaily = true
+    rebuildGrid()
+    resetBoard()
+    if MainFrame then
+        MainFrame.TitleText:SetText("WoWdle  |cff8888ff– Daily|r")
+        if MainFrame.newGameBtn then MainFrame.newGameBtn:Hide() end
+    end
+end
+
+local function startFreeGame()
+    state.answer  = applyWord(randomWord())
+    state.isDaily = false
+    rebuildGrid()
+    resetBoard()
+    if MainFrame then
+        MainFrame.TitleText:SetText("WoWdle  |cffffcc00– Free Play|r")
+        if MainFrame.newGameBtn then
+            MainFrame.newGameBtn:Show()
+            MainFrame.newGameBtn:SetText("New Word")
+        end
+    end
+end
+
+local function submitGuess()
+    if state.won or state.lost then return end
+
+    local guess = state.currentInput:upper()
+    if #guess ~= WORD_LENGTH then
+        MainFrame.msgText:SetText("|cffff4444Need " .. WORD_LENGTH .. " letters!|r")
+        return
+    end
+
+    local row    = #state.guesses + 1
+    local result = scoreGuess(guess, state.answer)
+
+    for col = 1, WORD_LENGTH do
+        updateTile(row, col, guess:sub(col, col), result[col])
+        updateKeyboard(guess:sub(col, col), result[col])
+    end
+
+    table.insert(state.guesses, guess)
+    state.currentInput = ""
+    InputBox:SetText("")
+
+    local allCorrect = true
+    for _, r in ipairs(result) do
+        if r ~= "correct" then allCorrect = false; break end
+    end
+
+    if allCorrect then
+        state.won = true
+        if state.isDaily then
+            markDailyCompleted()
+            local noun = #state.guesses == 1 and "guess" or "guesses"
+            MainFrame.msgText:SetText(
+                "|cff00ff7fFor the Horde! Daily word solved in " ..
+                #state.guesses .. " " .. noun .. "!|r\n" ..
+                "|cffaaaaaaFree Play is now unlocked for today.|r")
+            if MainFrame.newGameBtn then
+                MainFrame.newGameBtn:SetText("Free Play")
+                MainFrame.newGameBtn:Show()
+            end
+        else
+            MainFrame.msgText:SetText("|cff00ff7fFor the Horde! You got it!|r")
+        end
+    elseif #state.guesses >= state.maxGuesses then
+        state.lost = true
+        if state.isDaily then
+            markDailyCompleted()
+            MainFrame.msgText:SetText(
+                "|cffff4444Defeated! The word was: |cffffcc00" .. state.answer .. "|r\n" ..
+                "|cffaaaaaaFree Play is now unlocked for today.|r")
+            if MainFrame.newGameBtn then
+                MainFrame.newGameBtn:SetText("Free Play")
+                MainFrame.newGameBtn:Show()
+            end
+        else
+            MainFrame.msgText:SetText(
+                "|cffff4444Defeated! The word was: |cffffcc00" .. state.answer .. "|r")
+        end
+    end
+end
+
+-- ============================================================
+-- UI BUILDER  (called once; grid rebuilt per game via rebuildGrid)
+-- ============================================================
 local function createKeyButton(parent, letter, x, y)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(KEY_W, KEY_H)
     btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
 
     btn.bg = btn:CreateTexture(nil, "BACKGROUND")
-    btn.bg:SetAllPoints()
     btn.bg:SetColorTexture(0.20, 0.20, 0.25)
-
-    -- border
-    btn.border = btn:CreateTexture(nil, "BORDER")
-    btn.border:SetPoint("TOPLEFT", 1, -1)
-    btn.border:SetPoint("BOTTOMRIGHT", -1, 1)
-    btn.bg:SetPoint("TOPLEFT", 1, -1)
-    btn.bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    btn.bg:SetPoint("TOPLEFT",     btn, "TOPLEFT",      1, -1)
+    btn.bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1,  1)
 
     btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     btn.text:SetAllPoints()
     btn.text:SetJustifyH("CENTER")
     btn.text:SetJustifyV("MIDDLE")
     btn.text:SetText(letter)
-    btn.text:SetTextColor(1,1,1)
+    btn.text:SetTextColor(1, 1, 1)
 
     btn:SetScript("OnClick", function()
         if state.won or state.lost then return end
-        if #state.currentInput < 5 then
+        if #state.currentInput < WORD_LENGTH then
             state.currentInput = state.currentInput .. letter
             updateCurrentRowDisplay()
         end
@@ -320,71 +428,52 @@ end
 local function buildKeyboardRow(parent, letters, startX, startY)
     local x = startX
     for i = 1, #letters do
-        createKeyButton(parent, letters:sub(i,i), x, startY)
+        createKeyButton(parent, letters:sub(i, i), x, startY)
         x = x + KEY_W + 4
     end
 end
 
 local function BuildUI()
-    -- Main frame
     MainFrame = CreateFrame("Frame", "WoWdleFrame", UIParent, "BasicFrameTemplateWithInset")
-    MainFrame:SetSize(340, 560)
     MainFrame:SetPoint("CENTER")
     MainFrame:SetMovable(true)
     MainFrame:EnableMouse(true)
     MainFrame:RegisterForDrag("LeftButton")
     MainFrame:SetScript("OnDragStart", MainFrame.StartMoving)
-    MainFrame:SetScript("OnDragStop", MainFrame.StopMovingOrSizing)
+    MainFrame:SetScript("OnDragStop",  MainFrame.StopMovingOrSizing)
     MainFrame:Hide()
-
     MainFrame.TitleText:SetText("WoWdle")
 
-    -- Grid container
-    local gridW = 5 * TILE_SIZE + 4 * TILE_GAP
-    local gridH = 6 * TILE_SIZE + 5 * TILE_GAP
-    local grid = CreateFrame("Frame", nil, MainFrame)
-    grid:SetSize(gridW, gridH)
-    grid:SetPoint("TOP", MainFrame, "TOP", 0, -40)
+    -- Grid container — size set by rebuildGrid() each game
+    GridFrame = CreateFrame("Frame", nil, MainFrame)
+    GridFrame:SetPoint("TOP", MainFrame, "TOP", 0, -40)
 
-    for row = 1, 6 do
-        TileFrames[row] = {}
-        for col = 1, 5 do
-            TileFrames[row][col] = createTile(grid, row, col)
-        end
-    end
-
-    -- Message text
+    -- Message text, anchored below the grid
     MainFrame.msgText = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    MainFrame.msgText:SetPoint("TOP", grid, "BOTTOM", 0, -8)
+    MainFrame.msgText:SetPoint("TOP", GridFrame, "BOTTOM", 0, -8)
     MainFrame.msgText:SetWidth(300)
     MainFrame.msgText:SetText("")
 
-    -- Keyboard
+    -- Keyboard, anchored below message
     local kbFrame = CreateFrame("Frame", nil, MainFrame)
-    kbFrame:SetSize(300, 100)
+    kbFrame:SetSize(300, (KEY_H + 5) * 3)
     kbFrame:SetPoint("TOP", MainFrame.msgText, "BOTTOM", 0, -6)
 
-    local row1X = 2
-    local row2X = 16
-    local row3X = 30
+    local row1X, row2X, row3X = 2, 16, 30
     buildKeyboardRow(kbFrame, "QWERTYUIOP", row1X, 0)
     buildKeyboardRow(kbFrame, "ASDFGHJKL",  row2X, -(KEY_H + 5))
-    buildKeyboardRow(kbFrame, "ZXCVBNM",    row3X, -(KEY_H + 5)*2)
+    buildKeyboardRow(kbFrame, "ZXCVBNM",    row3X, -(KEY_H + 5) * 2)
 
-    -- Enter button
     local enterBtn = CreateFrame("Button", nil, kbFrame, "UIPanelButtonTemplate")
     enterBtn:SetSize(52, KEY_H)
-    enterBtn:SetPoint("TOPLEFT", kbFrame, "TOPLEFT", row3X + 7*(KEY_W+4) + 4, -(KEY_H+5)*2)
+    enterBtn:SetPoint("TOPLEFT", kbFrame, "TOPLEFT",
+                      row3X + 7 * (KEY_W + 4) + 4, -(KEY_H + 5) * 2)
     enterBtn:SetText("ENTER")
-    enterBtn:SetScript("OnClick", function()
-        submitGuess()
-        InputBox:SetFocus()
-    end)
+    enterBtn:SetScript("OnClick", function() submitGuess(); InputBox:SetFocus() end)
 
-    -- Backspace button
     local bsBtn = CreateFrame("Button", nil, kbFrame, "UIPanelButtonTemplate")
     bsBtn:SetSize(36, KEY_H)
-    bsBtn:SetPoint("TOPLEFT", kbFrame, "TOPLEFT", row3X - 40, -(KEY_H+5)*2)
+    bsBtn:SetPoint("TOPLEFT", kbFrame, "TOPLEFT", row3X - 40, -(KEY_H + 5) * 2)
     bsBtn:SetText("←")
     bsBtn:SetScript("OnClick", function()
         if #state.currentInput > 0 then
@@ -394,119 +483,50 @@ local function BuildUI()
         InputBox:SetFocus()
     end)
 
-    -- Hidden EditBox to capture keyboard input
+    -- Hidden EditBox for keyboard capture
     InputBox = CreateFrame("EditBox", "WoWdleInputBox", MainFrame)
-    InputBox:SetSize(1,1)
+    InputBox:SetSize(1, 1)
     InputBox:SetPoint("BOTTOM", MainFrame, "BOTTOM", 0, 8)
     InputBox:SetAutoFocus(false)
-    InputBox:SetMaxLetters(5)
 
     InputBox:SetScript("OnTextChanged", function(self)
         if state.won or state.lost then self:SetText(""); return end
         local txt = self:GetText():upper():gsub("[^A-Z]", "")
-        if #txt > 5 then txt = txt:sub(1,5) end
+        if #txt > WORD_LENGTH then txt = txt:sub(1, WORD_LENGTH) end
         state.currentInput = txt
         self:SetText(txt)
         updateCurrentRowDisplay()
     end)
 
     InputBox:SetScript("OnEnterPressed", function()
-        submitGuess()
-        InputBox:SetFocus()
+        submitGuess(); InputBox:SetFocus()
     end)
 
     InputBox:SetScript("OnKeyDown", function(self, key)
-        if key == "BACKSPACE" then
-            if #state.currentInput > 0 then
-                state.currentInput = state.currentInput:sub(1, -2)
-                self:SetText(state.currentInput)
-                updateCurrentRowDisplay()
-            end
+        if key == "BACKSPACE" and #state.currentInput > 0 then
+            state.currentInput = state.currentInput:sub(1, -2)
+            self:SetText(state.currentInput)
+            updateCurrentRowDisplay()
         end
     end)
 
-    -- New Game button
+    -- Free Play / New Word button (centered, hidden until daily is done)
     local newGameBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
     newGameBtn:SetSize(100, 24)
     newGameBtn:SetPoint("BOTTOM", MainFrame, "BOTTOM", 0, 30)
-    newGameBtn:SetText("New Game")
-    newGameBtn:SetScript("OnClick", startNewGame)
+    newGameBtn:SetText("Free Play")
+    newGameBtn:SetScript("OnClick", startFreeGame)
+    newGameBtn:Hide()
+    MainFrame.newGameBtn = newGameBtn
 
-    MainFrame:SetScript("OnShow", function()
-        InputBox:SetFocus()
-    end)
-end
-
--- ============================================================
--- MINIMAP BUTTON
--- ============================================================
-local function BuildMinimapButton()
-    local btn = CreateFrame("Button", "WoWdleMinimapButton", Minimap)
-    btn:SetSize(32, 32)
-    btn:SetFrameStrata("MEDIUM")
-    btn:SetFrameLevel(8)
-
-    -- Position on minimap edge
-    local angle = 45
-    local function updatePos()
-        local rad = math.rad(angle)
-        local x = math.cos(rad) * 80
-        local y = math.sin(rad) * 80
-        btn:SetPoint("CENTER", Minimap, "CENTER", x, y)
-    end
-    updatePos()
-
-    -- Icon
-    btn.icon = btn:CreateTexture(nil, "BACKGROUND")
-    btn.icon:SetAllPoints()
-    btn.icon:SetTexture("Interface\\Icons\\inv_inscription_scroll")
-
-    -- Border
-    btn.border = btn:CreateTexture(nil, "OVERLAY")
-    btn.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    btn.border:SetSize(56, 56)
-    btn.border:SetPoint("TOPLEFT", btn, "TOPLEFT", -12, 12)
-
-    btn:SetScript("OnClick", function()
-        if MainFrame:IsShown() then
-            MainFrame:Hide()
-        else
-            MainFrame:Show()
-        end
-    end)
-
-    btn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("WoWdle")
-        GameTooltip:AddLine("Click to play!", 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Draggable around minimap
-    btn:EnableMouse(true)
-    btn:RegisterForDrag("LeftButton")
-    btn:SetScript("OnDragStart", function(self)
-        self:SetScript("OnUpdate", function(self)
-            local mx, my = Minimap:GetCenter()
-            local cx, cy = GetCursorPosition()
-            local scale = Minimap:GetEffectiveScale()
-            cx, cy = cx/scale, cy/scale
-            angle = math.deg(math.atan2(cy - my, cx - mx))
-            updatePos()
-        end)
-    end)
-    btn:SetScript("OnDragStop", function(self)
-        self:SetScript("OnUpdate", nil)
-    end)
+    MainFrame:SetScript("OnShow", function() InputBox:SetFocus() end)
 end
 
 -- ============================================================
 -- SLASH COMMAND
 -- ============================================================
-SLASH_WOWDLE1 = "/wordle"
-SLASH_WOWDLE2 = "/wowdle"
-SlashCmdList["WOWDLE"] = function(msg)
+SLASH_WOWDLE1 = "/wowdle"
+SlashCmdList["WOWDLE"] = function()
     if MainFrame:IsShown() then
         MainFrame:Hide()
     else
@@ -520,8 +540,15 @@ end
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
+    WoWdle_SavedVars = WoWdle_SavedVars or {}
+
     BuildUI()
-    BuildMinimapButton()
-    startNewGame()
-    print("|cffffcc00WoWdle|r loaded! Type |cff00ccff/wordle|r or click the minimap button to play.")
+
+    if dailyAlreadyCompleted() then
+        startFreeGame()
+    else
+        startDailyGame()
+    end
+
+    print("|cffffcc00WoWdle|r loaded! Type |cff00ccff/wowdle|r to play.")
 end)

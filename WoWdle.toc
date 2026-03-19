@@ -4,5 +4,7 @@
 ## Author: You
 ## Version: 1.0
 ## SavedVariables: WoWdleSavedData
-
+## SavedVariables: WoWdle_SavedVars
+WoWdle_Words5.lua
+WoWdle_Words6.lua
 WoWdle.lua
