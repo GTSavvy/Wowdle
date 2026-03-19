@@ -30,12 +30,55 @@ local function loadAndValidate(letterCount)
 end
 
 -- Single flat list containing all 5- and 6-letter words.
-local WORDS = (function()
-    local pool = {}
-    for _, w in ipairs(loadAndValidate(5)) do table.insert(pool, w) end
-    for _, w in ipairs(loadAndValidate(6)) do table.insert(pool, w) end
-    return pool
-end)()
+-- ANSWER_SET is a hash for O(1) membership checks during guess validation.
+local WORDS      = {}
+local ANSWER_SET = {}   -- ANSWER_SET[word] = true
+do
+    for _, w in ipairs(loadAndValidate(5)) do
+        table.insert(WORDS, w)
+        ANSWER_SET[w] = true
+    end
+    for _, w in ipairs(loadAndValidate(6)) do
+        table.insert(WORDS, w)
+        ANSWER_SET[w] = true
+    end
+end
+
+-- ============================================================
+-- VALID GUESS SETS
+-- Loaded from WoWdle_ValidGuesses5.lua and WoWdle_ValidGuesses6.lua.
+-- These words are accepted as guesses but are never chosen as answers.
+-- Stored as hash sets for O(1) lookup.
+-- ============================================================
+
+local function loadValidGuesses(letterCount)
+    local source = WoWdle_ValidGuesses and WoWdle_ValidGuesses[letterCount]
+    if not source then
+        -- Valid guesses files are optional — just warn rather than error.
+        print("|cffffcc00WoWdle|r: WoWdle_ValidGuesses[" .. letterCount .. "] not found. "
+              .. "All " .. letterCount .. "-letter words will be accepted as guesses.")
+        return {}
+    end
+    local set = {}
+    for _, w in ipairs(source) do
+        w = w:upper()
+        if #w == letterCount then
+            set[w] = true
+        end
+    end
+    return set
+end
+
+local VALID_GUESSES = {
+    [5] = loadValidGuesses(5),
+    [6] = loadValidGuesses(6),
+}
+
+-- Returns true if word is an acceptable guess for the current game length.
+local function isValidGuess(word)
+    return ANSWER_SET[word] == true
+        or (VALID_GUESSES[#word] and VALID_GUESSES[#word][word] == true)
+end
 
 -- ============================================================
 -- SAVED VARIABLES  (declare in .toc: ## SavedVariables: WoWdle_SavedVars)
@@ -66,6 +109,104 @@ end
 
 local function markDailyCompleted()
     WoWdle_SavedVars.lastCompletedDate = todayStamp()
+end
+
+
+-- ============================================================
+-- STATS
+-- Stored in WoWdle_SavedVars.stats.
+-- Streaks are daily-only; free play counts toward played/won/distribution.
+-- ============================================================
+
+local function getStats()
+    if not WoWdle_SavedVars.stats then
+        WoWdle_SavedVars.stats = {
+            gamesPlayed      = 0,
+            gamesWon         = 0,
+            currentStreak    = 0,
+            bestStreak       = 0,
+            lastDailyWonDate = 0,
+            guessDistrib     = {0, 0, 0, 0, 0, 0},
+        }
+    end
+    if not WoWdle_SavedVars.stats.guessDistrib then
+        WoWdle_SavedVars.stats.guessDistrib = {0, 0, 0, 0, 0, 0}
+    end
+    return WoWdle_SavedVars.stats
+end
+
+-- Returns yesterday's date stamp.
+local function yesterdayStamp()
+    local t  = date("*t")
+    t.day    = t.day - 1
+    local ts = time(t)
+    local d  = date("*t", ts)
+    return d.year * 10000 + d.month * 100 + d.day
+end
+
+local function recordResult(won, guessCount, isDaily)
+    local s = getStats()
+    s.gamesPlayed = s.gamesPlayed + 1
+    if won then
+        s.gamesWon = s.gamesWon + 1
+        if guessCount >= 1 and guessCount <= 6 then
+            s.guessDistrib[guessCount] = s.guessDistrib[guessCount] + 1
+        end
+        if isDaily then
+            local today = todayStamp()
+            if s.lastDailyWonDate == yesterdayStamp() then
+                s.currentStreak = s.currentStreak + 1
+            elseif s.lastDailyWonDate ~= today then
+                s.currentStreak = 1
+            end
+            s.lastDailyWonDate = today
+            if s.currentStreak > s.bestStreak then
+                s.bestStreak = s.currentStreak
+            end
+        end
+    else
+        if isDaily then
+            s.currentStreak = 0
+        end
+    end
+end
+
+-- ============================================================
+-- OPTIONS
+-- Stored in WoWdle_SavedVars.options.
+-- Each option has a key, default value, label, and description.
+-- getOptions() always initialises missing keys so new options
+-- added in future versions appear cleanly for existing saves.
+-- ============================================================
+
+local OPTION_DEFS = {
+    -- Each entry: { key, default, label, desc }
+    -- Add new options here; the panel builds itself from this table.
+    {
+        key     = "validWordsOnly",
+        default = true,
+        label   = "Valid Words Only",
+        desc    = "Only words in the answer or guess lists are accepted.",
+    },
+    {
+        key     = "hardMode",
+        default = false,
+        label   = "Hard Mode",
+        desc    = "All revealed hints must be used in subsequent guesses.",
+    },
+}
+
+local function getOptions()
+    if not WoWdle_SavedVars.options then
+        WoWdle_SavedVars.options = {}
+    end
+    local opts = WoWdle_SavedVars.options
+    for _, def in ipairs(OPTION_DEFS) do
+        if opts[def.key] == nil then
+            opts[def.key] = def.default
+        end
+    end
+    return opts
 end
 
 -- ============================================================
@@ -331,6 +472,30 @@ local function startFreeGame()
     end
 end
 
+-- Returns an error message string if the guess violates hard mode constraints,
+-- or nil if the guess is acceptable. Derives required hints from prior guesses.
+local function checkHardMode(guess)
+    for _, prev in ipairs(state.guesses) do
+        local result = scoreGuess(prev, state.answer)
+        -- Correct letters must stay in the same position
+        for i = 1, WORD_LENGTH do
+            if result[i] == "correct" and guess:sub(i,i) ~= prev:sub(i,i) then
+                return "Position " .. i .. " must be " .. prev:sub(i,i) .. "!"
+            end
+        end
+        -- Present letters must appear somewhere in the new guess
+        for i = 1, WORD_LENGTH do
+            if result[i] == "present" then
+                local letter = prev:sub(i,i)
+                if not guess:find(letter, 1, true) then
+                    return "Guess must contain " .. letter .. "!"
+                end
+            end
+        end
+    end
+    return nil
+end
+
 local function submitGuess()
     if state.won or state.lost then return end
 
@@ -338,6 +503,19 @@ local function submitGuess()
     if #guess ~= WORD_LENGTH then
         MainFrame.msgText:SetText("|cffff4444Need " .. WORD_LENGTH .. " letters!|r")
         return
+    end
+
+    if getOptions().validWordsOnly and not isValidGuess(guess) then
+        MainFrame.msgText:SetText("|cffff4444Not in word list!|r")
+        return
+    end
+
+    if getOptions().hardMode then
+        local hardErr = checkHardMode(guess)
+        if hardErr then
+            MainFrame.msgText:SetText("|cffff4444" .. hardErr .. "|r")
+            return
+        end
     end
 
     local row    = #state.guesses + 1
@@ -359,6 +537,7 @@ local function submitGuess()
 
     if allCorrect then
         state.won = true
+        recordResult(true, #state.guesses, state.isDaily)
         if state.isDaily then
             markDailyCompleted()
             local noun = #state.guesses == 1 and "guess" or "guesses"
@@ -375,6 +554,7 @@ local function submitGuess()
         end
     elseif #state.guesses >= state.maxGuesses then
         state.lost = true
+        recordResult(false, #state.guesses, state.isDaily)
         if state.isDaily then
             markDailyCompleted()
             MainFrame.msgText:SetText(
@@ -456,6 +636,7 @@ local function BuildUI()
 
     -- Keyboard, anchored below message
     local kbFrame = CreateFrame("Frame", nil, MainFrame)
+    MainFrame.kbFrame = kbFrame
     kbFrame:SetSize(300, (KEY_H + 5) * 3)
     kbFrame:SetPoint("TOP", MainFrame.msgText, "BOTTOM", 0, -6)
 
@@ -510,27 +691,355 @@ local function BuildUI()
         end
     end)
 
-    -- Free Play / New Word button (centered, hidden until daily is done)
+    -- Bottom button row: [Free Play]  [Stats]  [Options]
+    --
+    -- Free Play / New Word (far left, hidden until daily done)
     local newGameBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    newGameBtn:SetSize(100, 24)
-    newGameBtn:SetPoint("BOTTOM", MainFrame, "BOTTOM", 0, 30)
+    newGameBtn:SetSize(90, 24)
+    newGameBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", 8, 8)
     newGameBtn:SetText("Free Play")
     newGameBtn:SetScript("OnClick", startFreeGame)
     newGameBtn:Hide()
     MainFrame.newGameBtn = newGameBtn
 
+    -- Options button (far right, always visible)
+    local optionsBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    optionsBtn:SetSize(70, 24)
+    optionsBtn:SetPoint("BOTTOMRIGHT", MainFrame, "BOTTOMRIGHT", -8, 8)
+    optionsBtn:SetText("Options")
+    optionsBtn:SetScript("OnClick", function()
+        if MainFrame.optionsPanel:IsShown() then
+            MainFrame.optionsPanel:Hide()
+        else
+            if MainFrame.statsPanel:IsShown() then MainFrame.statsPanel:Hide() end
+            MainFrame.optionsPanel:Show()
+        end
+    end)
+    MainFrame.optionsBtn = optionsBtn
+
+    -- Stats button (left of Options, always visible)
+    local statsBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    statsBtn:SetSize(60, 24)
+    statsBtn:SetPoint("BOTTOMRIGHT", optionsBtn, "BOTTOMLEFT", -4, 0)
+    statsBtn:SetText("Stats")
+    statsBtn:SetScript("OnClick", function()
+        if MainFrame.statsPanel:IsShown() then
+            MainFrame.statsPanel:Hide()
+        else
+            if MainFrame.optionsPanel:IsShown() then MainFrame.optionsPanel:Hide() end
+            MainFrame.statsPanel:refreshAndShow()
+        end
+    end)
+    MainFrame.statsBtn = statsBtn
+
+    -- Helpers to hide/restore the game content when a panel is shown.
+    local function hideGameContent()
+        GridFrame:Hide()
+        MainFrame.kbFrame:Hide()
+        MainFrame.msgText:Hide()
+    end
+
+    local function showGameContent()
+        GridFrame:Show()
+        MainFrame.kbFrame:Show()
+        MainFrame.msgText:Show()
+    end
+
+    -- ----------------------------------------------------------------
+    -- STATS PANEL  (child of UIParent, anchored to MainFrame on show)
+    -- ----------------------------------------------------------------
+    local sp = CreateFrame("Frame", "WoWdleStatsPanel", UIParent, "BackdropTemplate")
+    sp:SetFrameStrata("FULLSCREEN_DIALOG")
+    sp:SetFrameLevel(100)
+    sp:SetBackdrop({
+        bgFile   = "Interface\DialogFrame\UI-DialogBox-Background",
+        edgeFile = "Interface\Buttons\WHITE8X8",
+        edgeSize = 1,
+    })
+    sp:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
+    sp:SetBackdropBorderColor(0.4, 0.4, 0.5, 1)
+    sp:Hide()
+    sp:SetScript("OnShow", function(self)
+        self:ClearAllPoints()
+        self:SetPoint("TOPLEFT",     MainFrame, "TOPLEFT",      8, -28)
+        self:SetPoint("BOTTOMRIGHT", MainFrame, "BOTTOMRIGHT", -8,  28)
+        hideGameContent()
+    end)
+    sp:SetScript("OnHide", function()
+        if not MainFrame.optionsPanel or not MainFrame.optionsPanel:IsShown() then
+            showGameContent()
+        end
+    end)
+
+    -- Title
+    local spTitle = sp:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    spTitle:SetPoint("TOP", sp, "TOP", 0, -16)
+    spTitle:SetText("|cffffcc00Statistics|r")
+
+    -- Top stat boxes: Played / Win% / Streak / Best Streak
+    local statLabels = {"Played", "Win %", "Streak", "Best"}
+    local statKeys   = {"gamesPlayed", "winPct", "currentStreak", "bestStreak"}
+    local statValues = {}
+    local boxW, boxH = 58, 50
+    local totalW     = #statLabels * boxW + (#statLabels - 1) * 6
+    local startX     = -totalW / 2 + boxW / 2
+
+    for i, label in ipairs(statLabels) do
+        local bx = startX + (i - 1) * (boxW + 6)
+
+        local val = sp:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+        val:SetPoint("TOP", sp, "TOP", bx, -50)
+        val:SetJustifyH("CENTER")
+        val:SetText("0")
+        statValues[statKeys[i]] = val
+
+        local lbl = sp:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("TOP", val, "BOTTOM", 0, -2)
+        lbl:SetText(label)
+        lbl:SetTextColor(0.8, 0.8, 0.8)
+    end
+
+    -- Guess distribution header
+    local distHeader = sp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    distHeader:SetPoint("TOP", sp, "TOP", 0, -115)
+    distHeader:SetText("|cffaaaaaaGuess Distribution|r")
+
+    -- Distribution bars
+    local barRows   = {}
+    local barStartY = -135
+    local barH      = 20
+    local barSpacing = 26
+    local barMaxW   = 180
+
+    for i = 1, 6 do
+        local rowY = barStartY - (i - 1) * barSpacing
+
+        -- Row number label
+        local numLbl = sp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        numLbl:SetPoint("TOPLEFT", sp, "TOPLEFT", 14, rowY)
+        numLbl:SetText(tostring(i))
+        numLbl:SetJustifyH("CENTER")
+        numLbl:SetWidth(14)
+
+        -- Bar background
+        local barBg = CreateFrame("Frame", nil, sp, "BackdropTemplate")
+        barBg:SetHeight(barH)
+        barBg:SetPoint("TOPLEFT", sp, "TOPLEFT", 34, rowY)
+        barBg:SetBackdrop({ bgFile = "Interface\Buttons\WHITE8X8" })
+        barBg:SetBackdropColor(0.15, 0.15, 0.18, 1)
+
+        -- Bar fill
+        local barFill = CreateFrame("Frame", nil, barBg, "BackdropTemplate")
+        barFill:SetPoint("TOPLEFT",  barBg, "TOPLEFT",  0, 0)
+        barFill:SetPoint("BOTTOMLEFT", barBg, "BOTTOMLEFT", 0, 0)
+        barFill:SetBackdrop({ bgFile = "Interface\Buttons\WHITE8X8" })
+        barFill:SetBackdropColor(unpack(COLOR_ABSENT))
+
+        -- Count label inside bar
+        local countLbl = barFill:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        countLbl:SetPoint("RIGHT", barFill, "RIGHT", -4, 0)
+        countLbl:SetJustifyH("RIGHT")
+        countLbl:SetText("0")
+
+        barRows[i] = { bg = barBg, fill = barFill, count = countLbl }
+    end
+
+    -- Close button
+    local closeBtn = CreateFrame("Button", nil, sp, "UIPanelButtonTemplate")
+    closeBtn:SetSize(80, 24)
+    closeBtn:SetPoint("BOTTOM", sp, "BOTTOM", 0, 12)
+    closeBtn:SetText("Close")
+    closeBtn:SetScript("OnClick", function() sp:Hide() end)
+
+    -- Populate panel with live data
+    function sp:refreshAndShow()
+        local s   = getStats()
+        local pct = s.gamesPlayed > 0
+                    and math.floor(s.gamesWon / s.gamesPlayed * 100)
+                    or 0
+
+        statValues["gamesPlayed"]:SetText(tostring(s.gamesPlayed))
+        statValues["winPct"]:SetText(tostring(pct))
+        statValues["currentStreak"]:SetText(tostring(s.currentStreak))
+        statValues["bestStreak"]:SetText(tostring(s.bestStreak))
+
+        -- Find max for bar scaling (min 1 to avoid divide-by-zero)
+        local maxVal = 1
+        for i = 1, 6 do
+            if s.guessDistrib[i] > maxVal then maxVal = s.guessDistrib[i] end
+        end
+
+        -- Determine winning row (last game's guess count, if won)
+        local winRow = (state.won and #state.guesses >= 1 and #state.guesses <= 6)
+                       and #state.guesses or nil
+
+        for i = 1, 6 do
+            local v    = s.guessDistrib[i]
+            local frac = v / maxVal
+            local w    = math.max(24, math.floor(frac * barMaxW))  -- min width so "0" is visible
+
+            barRows[i].bg:SetWidth(barMaxW)
+            barRows[i].fill:SetWidth(w)
+            barRows[i].count:SetText(tostring(v))
+
+            if i == winRow then
+                barRows[i].fill:SetBackdropColor(unpack(COLOR_CORRECT))
+            else
+                barRows[i].fill:SetBackdropColor(unpack(COLOR_ABSENT))
+            end
+        end
+
+        self:Show()
+    end
+
+    MainFrame.statsPanel = sp
+
+    -- ----------------------------------------------------------------
+    -- OPTIONS PANEL  (child of MainFrame, same overlay style as stats)
+    -- ----------------------------------------------------------------
+    local op = CreateFrame("Frame", "WoWdleOptionsPanel", UIParent, "BackdropTemplate")
+    op:SetFrameStrata("FULLSCREEN_DIALOG")
+    op:SetFrameLevel(100)
+    op:SetBackdrop({
+        bgFile   = "Interface\DialogFrame\UI-DialogBox-Background",
+        edgeFile = "Interface\Buttons\WHITE8X8",
+        edgeSize = 1,
+    })
+    op:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
+    op:SetBackdropBorderColor(0.4, 0.4, 0.5, 1)
+    op:Hide()
+    op:SetScript("OnShow", function(self)
+        self:ClearAllPoints()
+        self:SetPoint("TOPLEFT",     MainFrame, "TOPLEFT",      8, -28)
+        self:SetPoint("BOTTOMRIGHT", MainFrame, "BOTTOMRIGHT", -8,  36)
+        hideGameContent()
+    end)
+    op:SetScript("OnHide", function()
+        if not MainFrame.statsPanel or not MainFrame.statsPanel:IsShown() then
+            showGameContent()
+        end
+    end)
+
+    -- Title
+    local opTitle = op:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    opTitle:SetPoint("TOP", op, "TOP", 0, -16)
+    opTitle:SetText("|cffffcc00Options|r")
+
+    -- Divider line under title
+    local divider = op:CreateTexture(nil, "ARTWORK")
+    divider:SetColorTexture(0.3, 0.3, 0.35, 1)
+    divider:SetSize(200, 1)
+    divider:SetPoint("TOP", opTitle, "BOTTOM", 0, -6)
+
+    -- Option rows built from OPTION_DEFS.
+    -- Each row: checkbox on left, label to its right, description on hover.
+    local ROW_H      = 28   -- compact single-line height
+    local ROW_INDENT = 14
+    local rowStartY  = -46
+
+    if #OPTION_DEFS == 0 then
+        local placeholder = op:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        placeholder:SetPoint("TOP", op, "TOP", 0, rowStartY - 10)
+        placeholder:SetText("|cff888888No options available yet.|r")
+    else
+        for i, def in ipairs(OPTION_DEFS) do
+            local rowY = rowStartY - (i - 1) * (ROW_H + 4)
+            local optKey = def.key
+
+            -- Checkbox (native WoW UICheckButtonTemplate: 26x26, has SetChecked/GetChecked)
+            local cb = CreateFrame("CheckButton", nil, op, "UICheckButtonTemplate")
+            cb:SetSize(24, 24)
+            cb:SetPoint("TOPLEFT", op, "TOPLEFT", ROW_INDENT, rowY)
+            cb:SetChecked(getOptions()[optKey])
+
+            -- Label to the right of the checkbox
+            local lbl = op:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            lbl:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+            lbl:SetJustifyH("LEFT")
+
+            -- Invisible hit area covering checkbox + label for tooltip.
+            -- Sized explicitly from the checkbox top-left so it doesn't
+            -- drift across rows.
+            local hitZone = CreateFrame("Frame", nil, op)
+            hitZone:SetPoint("TOPLEFT",     cb, "TOPLEFT",     0,  0)
+            hitZone:SetPoint("BOTTOMRIGHT", cb, "BOTTOMRIGHT", 160, 0)
+            hitZone:EnableMouse(true)
+            hitZone:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(def.label, 1, 1, 1)
+                GameTooltip:AddLine(def.desc, 0.8, 0.8, 0.8, true)
+                GameTooltip:Show()
+            end)
+            hitZone:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+            local function refreshCB()
+                local val    = getOptions()[optKey]
+                local locked = (optKey == "hardMode") and (#state.guesses > 0)
+                               and not (state.won or state.lost)
+                cb:SetChecked(val)
+                if locked then
+                    cb:Disable()
+                    lbl:SetTextColor(0.5, 0.5, 0.5)
+                else
+                    cb:Enable()
+                    lbl:SetTextColor(1, 1, 1)
+                end
+                -- Show lock hint in label when disabled mid-game
+                if locked then
+                    lbl:SetText(def.label .. " |cff666666(finish game to change)|r")
+                else
+                    lbl:SetText(def.label)
+                end
+            end
+            refreshCB()
+
+            cb:SetScript("OnClick", function(self)
+                local o = getOptions()
+                o[optKey] = self:GetChecked()
+                refreshCB()
+            end)
+
+            op:HookScript("OnShow", refreshCB)
+        end
+    end
+
+    -- Close button
+    local opClose = CreateFrame("Button", nil, op, "UIPanelButtonTemplate")
+    opClose:SetSize(80, 24)
+    opClose:SetPoint("BOTTOM", op, "BOTTOM", 0, 10)
+    opClose:SetText("Close")
+    opClose:SetScript("OnClick", function() op:Hide() end)
+
+    MainFrame.optionsPanel = op
+
     MainFrame:SetScript("OnShow", function() InputBox:SetFocus() end)
+    MainFrame:SetScript("OnHide", function()
+        sp:Hide()
+        op:Hide()
+        showGameContent()   -- restore so content is visible when window reopens
+    end)
 end
 
 -- ============================================================
 -- SLASH COMMAND
 -- ============================================================
 SLASH_WOWDLE1 = "/wowdle"
-SlashCmdList["WOWDLE"] = function()
-    if MainFrame:IsShown() then
-        MainFrame:Hide()
-    else
+SlashCmdList["WOWDLE"] = function(msg)
+    local arg = msg and msg:match("^%s*(%S+)%s*$")
+    if arg == "stats" then
         MainFrame:Show()
+        MainFrame.optionsPanel:Hide()
+        MainFrame.statsPanel:refreshAndShow()
+    elseif arg == "options" then
+        MainFrame:Show()
+        MainFrame.statsPanel:Hide()
+        MainFrame.optionsPanel:Show()
+    else
+        if MainFrame:IsShown() then
+            MainFrame:Hide()
+        else
+            MainFrame:Show()
+        end
     end
 end
 
@@ -550,5 +1059,6 @@ initFrame:SetScript("OnEvent", function()
         startDailyGame()
     end
 
-    print("|cffffcc00WoWdle|r loaded! Type |cff00ccff/wowdle|r to play.")
+    print("|cffffcc00WoWdle|r loaded! Type |cff00ccff/wowdle|r to play. "
+        .. "Use |cff00ccff/wowdle stats|r to view statistics.")
 end)

@@ -7,4 +7,6 @@
 ## SavedVariables: WoWdle_SavedVars
 WoWdle_Words5.lua
 WoWdle_Words6.lua
+WoWdle_ValidGuesses5.lua
+WoWdle_ValidGuesses6.lua
 WoWdle.lua

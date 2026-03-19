@@ -1,0 +1,182 @@
+-- WoWdle_ValidGuesses6.lua
+-- Common 6-letter English words accepted as valid guesses but NEVER used as answers.
+-- Every entry in this file must be exactly 6 letters. No exceptions.
+-- Add new words here; WoWdle.lua will deduplicate on load.
+
+WoWdle_ValidGuesses = WoWdle_ValidGuesses or {}
+WoWdle_ValidGuesses[6] = {
+    -- Popular 6-letter openers & high-frequency starters
+    "STRAIN", "CASTLE", "TABLES", "SENIOR", "INSERT",
+    "RETAIL", "TAILOR", "SATIRE", "ANTLER", "RENTAL",
+    "LEARNS", "SILENT", "LISTEN", "ENLIST", "TINSEL",
+    "ALERTS", "ALTERS", "SLATER",
+
+    -- A
+    "ABLAZE", "ABSURD", "ACCENT", "ACCEPT", "ACCESS",
+    "ACCORD", "ACROSS", "ACTING", "ACTION", "ACTIVE",
+    "ACTUAL", "ADJOIN", "ADMIRE", "ADORNS", "ADRIFT",
+    "ADULTS", "ADVICE", "ADVISE", "AFFECT", "AFFORD",
+    "AFRAID", "AGEING", "AGENDA", "AGENTS", "AGREED",
+    "AILING", "ALIGHT", "ALMOST", "ALWAYS", "AMOUNT",
+    "ANIMAL", "ANNUAL", "ANSWER", "ANTHEM", "ANYONE",
+    "ANYWAY", "APPEAL", "APPEAR", "AROUND", "ARRIVE",
+    "ARTIST", "ASPECT", "ASSURE", "ATTACH", "ATTACK",
+    "ATTAIN", "ATTEND", "AUTUMN", "AWAKEN",
+
+    -- B
+    "BANNER", "BARELY", "BARREL", "BATTLE", "BEACON",
+    "BEATEN", "BEAUTY", "BECAME", "BECOME", "BEFORE",
+    "BEGINS", "BEHIND", "BELIEF", "BELONG", "BESIDE",
+    "BETTER", "BEYOND", "BITTER", "BLAZED", "BLAZER",
+    "BLENDS", "BLIGHT", "BLITHE", "BLOCKS", "BLOWER",
+    "BOASTS", "BODIES", "BOLDER", "BORDER", "BORING",
+    "BORROW", "BOTTLE", "BOTTOM", "BOUNCE", "BRANCH",
+    "BREACH", "BRIGHT", "BROKEN", "BROWSE", "BRUTAL",
+    "BUBBLE", "BUDGET", "BURDEN", "BURNED", "BUTTON",
+
+    -- C
+    "CABLES", "CALMLY", "CAMERA", "CANCEL", "CANDID",
+    "CANDLE", "CANNOT", "CANTER", "CANVAS", "CARBON",
+    "CARPET", "CARROT", "CASINO", "CATTLE", "CAUGHT",
+    "CAVERN", "CENTER", "CHANCE", "CHANGE", "CHAPEL",
+    "CHARGE", "CHARMS", "CHOICE", "CIRCLE", "CLASSY",
+    "CLEVER", "CLIENT", "CLOSED", "CLOSER", "COARSE",
+    "COBALT", "COFFIN", "COMBAT", "COMPLY", "CORNER",
+    "COSTLY", "COTTON", "COUNTY", "COUPLE", "COURSE",
+    "COVERS", "CRAFTY", "CREATE", "CRISIS", "CRITIC",
+    "CRYING", "CUSTOM", "CUTTER", "CYCLES",
+
+    -- D
+    "DANGER", "DANGLE", "DARING", "DARKEN", "DEBATE",
+    "DECADE", "DECENT", "DECIDE", "DEFEAT", "DEFEND",
+    "DEFINE", "DEGREE", "DENIED", "DEPART", "DEPEND",
+    "DERIVE", "DESERT", "DESIRE", "DETAIL", "DEVOTE",
+    "DIFFER", "DIVERT", "DIVINE", "DOLLAR", "DONKEY",
+    "DOUBLE", "DRIVEN", "DRIVER", "DRYING", "DURING",
+
+    -- E
+    "EASILY", "EATING", "EFFECT", "EFFORT", "EIGHTH",
+    "EITHER", "ELEVEN", "EMERGE", "EMPIRE", "ENDURE",
+    "ENERGY", "ENGAGE", "ENGINE", "ENSURE", "ENTIRE",
+    "ESCAPE", "ESTATE", "EVENTS", "EVOLVE", "EXCEED",
+    "EXCITE", "EXCUSE", "EXPAND", "EXPECT", "EXPERT",
+    "EXPORT", "EXTEND",
+
+    -- F
+    "FABRIC", "FACTOR", "FAILED", "FAMINE", "FAMOUS",
+    "FASTEN", "FATHER", "FAULTS", "FIGURE", "FILTER",
+    "FINGER", "FINISH", "FIXING", "FLIGHT", "FLOWER",
+    "FLYING", "FOLLOW", "FORBID", "FOREST", "FORMAL",
+    "FORMED", "FOSSIL", "FOSTER", "FREEZE", "FRIEND",
+    "FROSTY", "FROZEN", "FUTURE",
+
+    -- G
+    "GALLON", "GARDEN", "GATHER", "GENTLE", "GENTLY",
+    "GIFTED", "GIVING", "GLANCE", "GLOBAL", "GOVERN",
+    "GRAVEL", "GREEDY", "GRIEVE", "GROUND", "GROWTH",
+    "GRUDGE",
+
+    -- H
+    "HAMPER", "HANDLE", "HAPPEN", "HARBOR", "HARDLY",
+    "HATRED", "HAZARD", "HEALTH", "HEARTH", "HEAVEN",
+    "HERALD", "HIDDEN", "HIGHER", "HONEST", "HOSTED",
+    "HUMBLE", "HUNGRY",
+
+    -- I
+    "IMPACT", "IMPORT", "INCOME", "INDEED", "INJURY",
+    "INVENT", "ISLAND", "ISSUED",
+
+    -- J
+    "JOINED", "JOSTLE", "JUNGLE", "JUNIOR",
+
+    -- K
+    "KEEPER", "KIDNAP", "KINDLY",
+
+    -- L
+    "LANCER", "LAMENT", "LANDER", "LAVISH", "LEADER",
+    "LEAGUE", "LEAPED", "LESSEN", "LESSON", "LETTER",
+    "LIFTED", "LINGER", "LIQUOR", "LISTED", "LIVELY",
+    "LIVING", "LOOKED", "LOWEST", "LUNGED", "LUXURY",
+
+    -- M
+    "MANAGE", "MARBLE", "MARKET", "MATTER", "MAYHEM",
+    "MEDIUM", "MEMBER", "MENTAL", "MENTOR", "METHOD",
+    "MIGHTY", "MIRROR", "MISERY", "MISSED", "MODEST",
+    "MOMENT", "MORTAL", "MOSTLY", "MOTION", "MOTIVE",
+    "MOVERS", "MOVING", "MURDER", "MUSCLE", "MUTUAL",
+    "MYSTIC",
+
+    -- N
+    "NARROW", "NATION", "NATURE", "NEARBY", "NEARLY",
+    "NEEDED", "NESTED", "NEURAL", "NORMAL", "NOTICE",
+    "NOTIFY", "NUMBER",
+
+    -- O
+    "OBJECT", "OBTAIN", "OFFEND", "OPENER", "OPPOSE",
+    "OPTION", "ORANGE", "ORDEAL", "ORIGIN", "OUTPUT",
+    "OUTRUN",
+
+    -- P
+    "PACING", "PALACE", "PATRON", "PEOPLE", "PERMIT",
+    "PILLAR", "PIRATE", "PLACED", "PLANET", "PLENTY",
+    "POLICY", "PORTAL", "POSTED", "POWDER", "POWERS",
+    "PREFER", "PRETTY", "PROFIT", "PROMPT", "PROPER",
+    "PROVEN", "PUBLIC", "PULSAR", "PUNISH", "PURSUE",
+    "PUZZLE",
+
+    -- R
+    "RAGGED", "RANSOM", "RATHER", "RAVINE", "REALLY",
+    "REASON", "RECORD", "REDUCE", "REFINE", "REFORM",
+    "REFUSE", "REGARD", "REGION", "REJECT", "RELATE",
+    "RELIEF", "REMAIN", "REMOTE", "REMOVE", "REPAIR",
+    "REPEAL", "REPEAT", "RESCUE", "RESIST", "RETURN",
+    "REVEAL", "REVIEW", "REVIVE", "REVOLT", "REWARD",
+    "RIBBON", "RISING", "RITUAL", "ROBUST", "ROCKET",
+    "ROTTEN", "RULING", "RUNNER",
+
+    -- S
+    "SADDLE", "SAFELY", "SAFETY", "SAVAGE", "SCARCE",
+    "SEARCH", "SECOND", "SECRET", "SECTOR", "SECURE",
+    "SELECT", "SERIES", "SETTLE", "SEVERE", "SIGNAL",
+    "SIMPLE", "SINGLE", "SISTER", "SLIDER", "SLIGHT",
+    "SMOOTH", "SORROW", "SQUARE", "STABLE", "STATUE",
+    "STATUS", "STEADY", "STOLEN", "STRIKE", "STRONG",
+    "STRUCK", "STUDIO", "STUPID", "SUBMIT", "SUFFER",
+    "SUMMER", "SUPPLY", "SURELY", "SURVEY", "SWITCH",
+    "SYMBOL", "SYSTEM",
+
+    -- T
+    "TALENT", "TARGET", "TAUGHT", "TENDER", "TERROR",
+    "TESTED", "THIRTY", "THOUGH", "THREAT", "THRONE",
+    "TIMBER", "TISSUE", "TONGUE", "TOSSED", "TOUCHY",
+    "TOWARD", "TRAVEL", "TREATY", "TRIBAL", "TRIPLE",
+    "TROWEL", "TRYING", "TUNNEL", "TWELVE", "TWENTY",
+    "TWITCH", "TYRANT",
+
+    -- U
+    "UNIQUE", "UNLESS", "UPHOLD", "UPKEEP", "UPLIFT",
+    "USEFUL",
+
+    -- V
+    "VALLEY", "VANISH", "VARIED", "VENDOR", "VERBAL",
+    "VERIFY", "VICTIM", "VIEWED", "VIRTUE", "VISION",
+    "VISUAL", "VOYAGE",
+
+    -- W
+    "WANDER", "WARMTH", "WEALTH", "WEAPON", "WEEKLY",
+    "WEIGHT", "WILDLY", "WISDOM", "WITHIN", "WONDER",
+    "WOODEN", "WORKER", "WORTHY", "WOUNDS",
+
+    -- Y
+    "YEARLY", "YELLOW",
+
+    -- Additional common words
+    "ABLEST", "ABROAD", "ABSENT", "ABSORB", "ACHING", "ACQUIT", "ADHERE", "ADVENT", "AERIAL", "AFFIRM",
+    "ALBEIT", "ALLUDE", "ALLURE", "ALMOND", "ALPACA", "ALPINE", "AMIDST", "ANCHOR", "ANEMIA", "ANGINA",
+    "ANNEAL", "ANOINT", "ANTRUM", "AROUSE", "ASCENT", "ASTRAY", "ASTUTE", "AUGUST", "BANANA", "BARLEY",
+    "BARTER", "BEAMED", "BENIGN", "BOXING", "CENSUS", "COLUMN", "CRINGE", "DARKLY", "DEADLY", "DEFECT",
+    "DEPLOY", "DIVIDE", "EARTHY", "EVENLY", "EXPEND", "EXPOSE", "FEISTY", "FELINE", "FICKLE", "GENOME",
+    "GREASE", "GREASY", "GRUMPY", "HEROIC", "HEROIN", "INSIST", "INSULT", "INTACT", "INTEND", "IRONIC",
+    "MUSTER", "NICKEL", "OUTLAW", "PADDLE", "PALATE", "PONDER", "POTENT", "RECKON", "SAMPLE", "SCORCH",
+    "SCRIBE", "SCROLL", "YONDER",
+}
