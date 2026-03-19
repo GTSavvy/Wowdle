@@ -776,8 +776,8 @@ local function BuildUI()
     sp:SetFrameStrata("FULLSCREEN_DIALOG")
     sp:SetFrameLevel(100)
     sp:SetBackdrop({
-        bgFile   = "Interface\DialogFrame\UI-DialogBox-Background",
-        edgeFile = "Interface\Buttons\WHITE8X8",
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
     })
     sp:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
@@ -849,14 +849,14 @@ local function BuildUI()
         local barBg = CreateFrame("Frame", nil, sp, "BackdropTemplate")
         barBg:SetHeight(barH)
         barBg:SetPoint("TOPLEFT", sp, "TOPLEFT", 34, rowY)
-        barBg:SetBackdrop({ bgFile = "Interface\Buttons\WHITE8X8" })
+        barBg:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
         barBg:SetBackdropColor(0.15, 0.15, 0.18, 1)
 
         -- Bar fill
         local barFill = CreateFrame("Frame", nil, barBg, "BackdropTemplate")
         barFill:SetPoint("TOPLEFT",  barBg, "TOPLEFT",  0, 0)
         barFill:SetPoint("BOTTOMLEFT", barBg, "BOTTOMLEFT", 0, 0)
-        barFill:SetBackdrop({ bgFile = "Interface\Buttons\WHITE8X8" })
+        barFill:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
         barFill:SetBackdropColor(unpack(COLOR_ABSENT))
 
         -- Count label inside bar
@@ -925,8 +925,8 @@ local function BuildUI()
     op:SetFrameStrata("FULLSCREEN_DIALOG")
     op:SetFrameLevel(100)
     op:SetBackdrop({
-        bgFile   = "Interface\DialogFrame\UI-DialogBox-Background",
-        edgeFile = "Interface\Buttons\WHITE8X8",
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
     })
     op:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
