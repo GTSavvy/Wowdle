@@ -86,17 +86,67 @@ end
 WoWdle_SavedVars = WoWdle_SavedVars or {}
 
 -- ============================================================
+-- OPTIONS
+-- Stored in WoWdle_SavedVars.options.
+-- Must be defined before daily helpers so activePool() is available.
+-- ============================================================
+
+local OPTION_DEFS = {
+    -- Each entry: { key, default, label, desc }
+    -- Add new options here; the panel builds itself from this table.
+    {
+        key     = "validWordsOnly",
+        default = true,
+        label   = "Valid Words Only",
+        desc    = "Only words in the answer or guess lists are accepted.",
+    },
+    {
+        key     = "hardMode",
+        default = false,
+        label   = "Hard Mode",
+        desc    = "All revealed hints must be used in subsequent guesses.",
+    },
+    {
+        key     = "sixLetterWords",
+        default = true,
+        label   = "6-Letter Words",
+        desc    = "Include 6-letter words in the answer pool.",
+    },
+}
+
+local function getOptions()
+    if not WoWdle_SavedVars.options then
+        WoWdle_SavedVars.options = {}
+    end
+    local opts = WoWdle_SavedVars.options
+    for _, def in ipairs(OPTION_DEFS) do
+        if opts[def.key] == nil then
+            opts[def.key] = def.default
+        end
+    end
+    return opts
+end
+
+-- Returns the answer pool filtered by current options.
+-- Called at game-start so option changes take effect on the next game.
+local function activePool()
+    if getOptions().sixLetterWords then
+        return WORDS   -- full pool, no filtering needed
+    end
+    local pool = {}
+    for _, w in ipairs(WORDS) do
+        if #w == 5 then table.insert(pool, w) end
+    end
+    return pool
+end
+
+-- ============================================================
 -- DAILY WORD HELPERS
 -- ============================================================
 
 local function todayStamp()
     local t = date("*t")
     return t.year * 10000 + t.month * 100 + t.day
-end
-
-local function dailyIndex(stamp)
-    local h = (stamp * 2654435761) % (2^32)
-    return (h % #WORDS) + 1
 end
 
 local function getDailyWord()
@@ -174,50 +224,6 @@ local function recordResult(won, guessCount, isDaily)
 end
 
 -- ============================================================
--- OPTIONS
--- Stored in WoWdle_SavedVars.options.
--- Each option has a key, default value, label, and description.
--- getOptions() always initialises missing keys so new options
--- added in future versions appear cleanly for existing saves.
--- ============================================================
-
-local OPTION_DEFS = {
-    -- Each entry: { key, default, label, desc }
-    -- Add new options here; the panel builds itself from this table.
-    {
-        key     = "validWordsOnly",
-        default = true,
-        label   = "Valid Words Only",
-        desc    = "Only words in the answer or guess lists are accepted.",
-    },
-    {
-        key     = "hardMode",
-        default = false,
-        label   = "Hard Mode",
-        desc    = "All revealed hints must be used in subsequent guesses.",
-    },
-    {
-        key     = "sixLetterWords",
-        default = true,
-        label   = "6-Letter Words",
-        desc    = "Include 6-letter words in the answer pool.",
-    },
-}
-
-local function getOptions()
-    if not WoWdle_SavedVars.options then
-        WoWdle_SavedVars.options = {}
-    end
-    local opts = WoWdle_SavedVars.options
-    for _, def in ipairs(OPTION_DEFS) do
-        if opts[def.key] == nil then
-            opts[def.key] = def.default
-        end
-    end
-    return opts
-end
-
--- ============================================================
 -- ACTIVE WORD LENGTH  (derived from state.answer, never set manually)
 -- ============================================================
 local WORD_LENGTH = 5   -- updated by applyWord() before any UI call
@@ -290,24 +296,19 @@ local COLOR_ABSENT  = {0.28, 0.28, 0.28, 1}
 local COLOR_EMPTY   = {0.10, 0.10, 0.10, 1}
 local COLOR_TEXT    = {1, 1, 1}
 
+-- WoW item rarity colors mapped to guess count (1=Legendary ... 6=Poor/Junk)
+local RARITY_COLORS = {
+    [1] = {1.00, 0.50, 0.00, 1},   -- Legendary (orange)
+    [2] = {0.64, 0.21, 0.93, 1},   -- Epic      (purple)
+    [3] = {0.00, 0.44, 0.87, 1},   -- Rare      (blue)
+    [4] = {0.12, 1.00, 0.00, 1},   -- Uncommon  (green)
+    [5] = {1.00, 1.00, 1.00, 1},   -- Common    (white)
+    [6] = {0.62, 0.62, 0.62, 1},   -- Poor/Junk (grey)
+}
+
 -- ============================================================
 -- HELPERS
 -- ============================================================
-
--- Returns the subset of WORDS that matches current options.
--- Called at game-start so toggling between games takes effect immediately.
-local function activePool()
-    if getOptions().sixLetterWords then
-        return WORDS   -- full pool, no filtering needed
-    end
-    -- Build a 5-only list. Cache it to avoid rebuilding on every call.
-    local pool = {}
-    for _, w in ipairs(WORDS) do
-        if #w == 5 then table.insert(pool, w) end
-    end
-    return pool
-end
-
 local function randomWord()
     local pool = activePool()
     return pool[math.random(1, #pool)]
@@ -838,12 +839,13 @@ local function BuildUI()
     for i = 1, 6 do
         local rowY = barStartY - (i - 1) * barSpacing
 
-        -- Row number label
+        -- Row number label, coloured by rarity
         local numLbl = sp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         numLbl:SetPoint("TOPLEFT", sp, "TOPLEFT", 14, rowY)
         numLbl:SetText(tostring(i))
         numLbl:SetJustifyH("CENTER")
         numLbl:SetWidth(14)
+        numLbl:SetTextColor(unpack(RARITY_COLORS[i]))
 
         -- Bar background
         local barBg = CreateFrame("Frame", nil, sp, "BackdropTemplate")
@@ -906,10 +908,15 @@ local function BuildUI()
             barRows[i].fill:SetWidth(w)
             barRows[i].count:SetText(tostring(v))
 
+            local rc = RARITY_COLORS[i]
             if i == winRow then
-                barRows[i].fill:SetBackdropColor(unpack(COLOR_CORRECT))
+                -- Brighten the winning bar slightly so it stands out
+                barRows[i].fill:SetBackdropColor(rc[1], rc[2], rc[3], 1)
+                barRows[i].bg:SetBackdropColor(rc[1] * 0.35, rc[2] * 0.35, rc[3] * 0.35, 1)
             else
-                barRows[i].fill:SetBackdropColor(unpack(COLOR_ABSENT))
+                -- Dimmed version of the rarity color for non-winning bars
+                barRows[i].fill:SetBackdropColor(rc[1] * 0.55, rc[2] * 0.55, rc[3] * 0.55, 1)
+                barRows[i].bg:SetBackdropColor(0.15, 0.15, 0.18, 1)
             end
         end
 
