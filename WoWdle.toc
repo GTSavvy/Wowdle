@@ -2,7 +2,7 @@
 ## Title: WoWdle
 ## Notes: A WoW-themed Wordle game. Type /wordle to play!
 ## Author: You
-## Version: 1.0
+## Version: 0.1.0
 ## SavedVariables: WoWdleSavedData
 ## SavedVariables: WoWdle_SavedVars
 WoWdle_Words5.lua
