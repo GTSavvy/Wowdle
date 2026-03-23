@@ -5,10 +5,11 @@ local addonName, addon = ...
 
 -- ============================================================
 -- WORD LIST
--- Loaded from WoWdle_Words5.lua and WoWdle_Words6.lua.
--- Both files must be listed before this one in the .toc.
+-- Loaded from WoWdle_Words5.lua and WoWdle_Words6.lua (core WoW words)
+-- and optionally Blizzard_Words5.lua / Blizzard_Words6.lua (other Blizzard IPs).
+-- All files must be listed before this one in the .toc.
 -- Words of both lengths are merged into one flat pool.
--- Each game picks randomly from the full pool; the UI resizes
+-- Each game picks randomly from the active pool; the UI resizes
 -- to match whatever length is drawn.
 -- ============================================================
 
@@ -29,10 +30,29 @@ local function loadAndValidate(letterCount)
     return clean
 end
 
--- Single flat list containing all 5- and 6-letter words.
--- ANSWER_SET is a hash for O(1) membership checks during guess validation.
-local WORDS      = {}
-local ANSWER_SET = {}   -- ANSWER_SET[word] = true
+-- Loads the Blizzard-IP word list for a given letter count.
+-- Returns an empty table gracefully if the file wasn't loaded.
+local function loadBlizzardWords(letterCount)
+    local source = WoWdle_BlizzardWords and WoWdle_BlizzardWords[letterCount]
+    if not source then return {} end
+    local seen, clean = {}, {}
+    for _, w in ipairs(source) do
+        w = w:upper()
+        if #w == letterCount and not seen[w] then
+            seen[w] = true
+            table.insert(clean, w)
+        end
+    end
+    return clean
+end
+
+-- Core WoW word pool (always active).
+-- ANSWER_SET covers both WoW and Blizzard words for guess validation
+-- regardless of whether the Blizzard option is on — a player should always
+-- be able to guess a Blizzard word even if it won't be chosen as an answer.
+local WORDS          = {}   -- core WoW words only
+local BLIZZARD_WORDS = {}   -- Blizzard-IP words only
+local ANSWER_SET     = {}   -- all known answer words (WoW + Blizzard) for validation
 do
     for _, w in ipairs(loadAndValidate(5)) do
         table.insert(WORDS, w)
@@ -40,6 +60,14 @@ do
     end
     for _, w in ipairs(loadAndValidate(6)) do
         table.insert(WORDS, w)
+        ANSWER_SET[w] = true
+    end
+    for _, w in ipairs(loadBlizzardWords(5)) do
+        table.insert(BLIZZARD_WORDS, w)
+        ANSWER_SET[w] = true
+    end
+    for _, w in ipairs(loadBlizzardWords(6)) do
+        table.insert(BLIZZARD_WORDS, w)
         ANSWER_SET[w] = true
     end
 end
@@ -112,6 +140,12 @@ local OPTION_DEFS = {
         label   = "6-Letter Words",
         desc    = "Include 6-letter words in the answer pool.",
     },
+    {
+        key     = "blizzardWords",
+        default = false,
+        label   = "Blizzard Words",
+        desc    = "Include words from other Blizzard titles (Overwatch, StarCraft, Diablo, etc.).",
+    },
 }
 
 local function getOptions()
@@ -130,12 +164,27 @@ end
 -- Returns the answer pool filtered by current options.
 -- Called at game-start so option changes take effect on the next game.
 local function activePool()
-    if getOptions().sixLetterWords then
-        return WORDS   -- full pool, no filtering needed
+    local opts   = getOptions()
+    local want6  = opts.sixLetterWords
+    local wantBz = opts.blizzardWords
+
+    -- Fast path: everything enabled, return full combined pool
+    if want6 and wantBz then
+        local pool = {}
+        for _, w in ipairs(WORDS)          do table.insert(pool, w) end
+        for _, w in ipairs(BLIZZARD_WORDS) do table.insert(pool, w) end
+        return pool
     end
+
+    -- Build filtered pool
     local pool = {}
     for _, w in ipairs(WORDS) do
-        if #w == 5 then table.insert(pool, w) end
+        if want6 or #w == 5 then table.insert(pool, w) end
+    end
+    if wantBz then
+        for _, w in ipairs(BLIZZARD_WORDS) do
+            if want6 or #w == 5 then table.insert(pool, w) end
+        end
     end
     return pool
 end
@@ -1005,7 +1054,7 @@ local function BuildUI()
 
             local function refreshCB()
                 local val    = getOptions()[optKey]
-                local locked = (optKey == "hardMode" or optKey == "sixLetterWords")
+                local locked = (optKey == "hardMode" or optKey == "sixLetterWords" or optKey == "blizzardWords")
                                and (#state.guesses > 0)
                                and not (state.won or state.lost)
                 cb:SetChecked(val)

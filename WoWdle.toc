@@ -1,12 +1,13 @@
 ## Interface: 120001
 ## Title: WoWdle
-## Notes: A WoW-themed Wordle game. Type /wordle to play!
+## Notes: A WoW-themed Wordle game. Type /wowdle to play!
 ## Author: You
-## Version: 0.1.0
-## SavedVariables: WoWdleSavedData
+## Version: 0.1.1
 ## SavedVariables: WoWdle_SavedVars
 WoWdle_Words5.lua
 WoWdle_Words6.lua
+Blizzard_Words5.lua
+Blizzard_Words6.lua
 WoWdle_ValidGuesses5.lua
 WoWdle_ValidGuesses6.lua
 WoWdle.lua

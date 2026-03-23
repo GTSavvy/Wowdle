@@ -13,7 +13,7 @@ WoWdle_Words[6] = {
 
     -- Named characters & lore figures
     "THRALL", "ANDUIN", "ARTHAS", "TIRION", "CAIRNE",
-    "REHGAR",
+    "REHGAR", "XAVIUS",
 
     -- Locations & zones
     "ORIBOS", "ULDUAR",
