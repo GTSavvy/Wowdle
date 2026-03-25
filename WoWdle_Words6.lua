@@ -33,7 +33,7 @@ WoWdle_Words[6] = {
 
     -- General WoW terms & culture
     "TALENT", "REBUFF", "GANKED", "WASTES", "SUNKEN",
-    "DEPTHS", "SHADOW",
+    "DEPTHS", "SHADOW", "LEGION",
 
     -- Shadowlands
     "STYGIA", "ZERETH",

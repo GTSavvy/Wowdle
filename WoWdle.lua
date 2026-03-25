@@ -332,14 +332,13 @@ local COLOR_ABSENT  = {0.28, 0.28, 0.28, 1}
 local COLOR_EMPTY   = {0.10, 0.10, 0.10, 1}
 local COLOR_TEXT    = {1, 1, 1}
 
---- WoW item rarity colors mapped to guess count (1=Legendary ... 6=Poor/Junk)
 local RARITY_COLORS = {
-    [1] = {1.00, 0.50, 0.00, 1},   -- Legendary (orange)
-    [2] = {0.64, 0.21, 0.93, 1},   -- Epic      (purple)
-    [3] = {0.00, 0.44, 0.87, 1},   -- Rare      (blue)
-    [4] = {0.12, 1.00, 0.00, 1},   -- Uncommon  (green)
-    [5] = {1.00, 1.00, 1.00, 1},   -- Common    (white)
-    [6] = {0.62, 0.62, 0.62, 1},   -- Poor/Junk (grey)
+    [1] = {1.00, 0.50, 0.00, 1},
+    [2] = {0.64, 0.21, 0.93, 1},
+    [3] = {0.00, 0.44, 0.87, 1},
+    [4] = {0.12, 1.00, 0.00, 1},
+    [5] = {1.00, 1.00, 1.00, 1},
+    [6] = {0.62, 0.62, 0.62, 1},
 }
 
 -- ============================================================
@@ -510,6 +509,9 @@ local function clearSlot(slot)
     end
 end
 
+-- Forward declaration — defined in GAME LOGIC section below.
+local resetBoard
+
 -- Replays a saved slot onto the board. Returns true on success.
 -- If isDaily and the stamp is stale, breaks streak and returns false.
 local function replaySlot(saved, isDaily)
@@ -525,12 +527,14 @@ local function replaySlot(saved, isDaily)
     state.answer       = applyWord(saved.answer)
     state.isDaily      = isDaily
     state.guesses      = {}
-    state.won          = saved.won  or false
-    state.lost         = saved.lost or false
     state.currentInput = ""
 
     rebuildGrid()
     resetBoard()
+
+    -- Restore won/lost after resetBoard (which clears them to false).
+    state.won  = saved.won  or false
+    state.lost = saved.lost or false
 
     for _, guess in ipairs(saved.guesses) do
         local row    = #state.guesses + 1
@@ -638,7 +642,7 @@ end
 -- ============================================================
 -- GAME LOGIC
 -- ============================================================
-local function resetBoard()
+resetBoard = function()
     state.guesses      = {}
     state.currentInput = ""
     state.won          = false
@@ -863,7 +867,7 @@ local function BuildUI()
     local bsBtn = CreateFrame("Button", nil, kbFrame, "UIPanelButtonTemplate")
     bsBtn:SetSize(36, KEY_H)
     bsBtn:SetPoint("TOPLEFT", kbFrame, "TOPLEFT", row3X - 40, -(KEY_H + 5) * 2)
-    bsBtn:SetText("←")
+    bsBtn:SetText("Del")
     bsBtn:SetScript("OnClick", function()
         if #state.currentInput > 0 then
             state.currentInput = state.currentInput:sub(1, -2)
@@ -898,28 +902,25 @@ local function BuildUI()
         end
     end)
 
-    -- Bottom buttons: [Daily] [Free Play] [New Word]   [Stats] [Options]
+    -- Bottom buttons: [Switch Mode] [New Word]   [Stats] [Options]
     --
-    -- Daily button (always visible, highlighted when in daily mode)
-    local dailyBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    dailyBtn:SetSize(60, 24)
-    dailyBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", 8, 8)
-    dailyBtn:SetText("Daily")
-    dailyBtn:SetScript("OnClick", switchToDaily)
-    MainFrame.dailyBtn = dailyBtn
-
-    -- Free Play button (always visible, highlighted when in free play mode)
-    local freeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    freeBtn:SetSize(75, 24)
-    freeBtn:SetPoint("BOTTOMLEFT", dailyBtn, "BOTTOMRIGHT", 4, 0)
-    freeBtn:SetText("Free Play")
-    freeBtn:SetScript("OnClick", switchToFreePlay)
-    MainFrame.freeBtn = freeBtn
+    -- Single mode toggle — label always shows the *other* mode so clicking switches to it.
+    local modeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    modeBtn:SetSize(90, 24)
+    modeBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", 8, 8)
+    modeBtn:SetScript("OnClick", function()
+        if state.isDaily then
+            switchToFreePlay()
+        else
+            switchToDaily()
+        end
+    end)
+    MainFrame.modeBtn = modeBtn
 
     -- New Word button (only visible in free play mode)
     local newWordBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
     newWordBtn:SetSize(80, 24)
-    newWordBtn:SetPoint("BOTTOMLEFT", freeBtn, "BOTTOMRIGHT", 4, 0)
+    newWordBtn:SetPoint("BOTTOMLEFT", modeBtn, "BOTTOMRIGHT", 4, 0)
     newWordBtn:SetText("New Word")
     newWordBtn:SetScript("OnClick", function()
         -- Only count as skipped if the player actually made at least one guess.
@@ -933,15 +934,13 @@ local function BuildUI()
     newWordBtn:Hide()
     MainFrame.newWordBtn = newWordBtn
 
-    -- Highlights the active mode button and shows/hides New Word.
+    -- Updates the mode toggle label and shows/hides New Word.
     refreshModeButtons = function()
         if state.isDaily then
-            dailyBtn:SetAlpha(1.0)
-            freeBtn:SetAlpha(0.5)
+            modeBtn:SetText("Free Play")
             newWordBtn:Hide()
         else
-            dailyBtn:SetAlpha(0.5)
-            freeBtn:SetAlpha(1.0)
+            modeBtn:SetText("Daily")
             newWordBtn:Show()
         end
     end
