@@ -3,9 +3,10 @@
 -- Every entry in this file must be exactly 6 letters. No exceptions.
 -- List this file in your .toc AFTER WoWdle_Words6.lua so the table already exists.
 -- WoWdle.lua will deduplicate on load, so any overlap with the WoW list is harmless.
+-- These words are only included in the answer pool when the "Blizzard Words" option is enabled.
 
-WoWdle_Words = WoWdle_Words or {}
-WoWdle_Words[6] = WoWdle_Words[6] or {}
+WoWdle_BlizzardWords = WoWdle_BlizzardWords or {}
+WoWdle_BlizzardWords[6] = WoWdle_BlizzardWords[6] or {}
 
 local _bliz6 = {
 
@@ -178,10 +179,10 @@ local _bliz6 = {
     "ESPORT",   -- Esports — Blizzard is foundational to competitive gaming
 }
 
--- Merge into the answer pool; WoWdle.lua deduplicates on load.
+-- Merge into the Blizzard word pool; WoWdle.lua deduplicates on load.
 for _, w in ipairs(_bliz6) do
     w = w:upper()
     if #w == 6 then
-        table.insert(WoWdle_Words[6], w)
+        table.insert(WoWdle_BlizzardWords[6], w)
     end
 end

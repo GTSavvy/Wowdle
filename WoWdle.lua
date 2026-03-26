@@ -131,6 +131,12 @@ local OPTION_DEFS = {
         label   = "Blizzard Words",
         desc    = "Include words from other Blizzard titles (Overwatch, StarCraft, Diablo, etc.).",
     },
+    {
+        key     = "minimapButton",
+        default = true,
+        label   = "Minimap Button",
+        desc    = "Show a button on the minimap to open WoWdle.",
+    },
 }
 
 local function getOptions()
@@ -288,6 +294,7 @@ local state = {
 -- FRAME REFERENCES
 -- ============================================================
 local MainFrame, InputBox, GridFrame
+local MinimapBtn  -- also referenced by the options panel checkbox
 local TileFrames = {}
 local KeyButtons = {}
 
@@ -319,8 +326,12 @@ local function frameWidth(len)
     return gridWidth(len) + FRAME_PADDING * 2
 end
 
-local function frameHeight(len)
-    return gridHeight(len) + 30 + (KEY_H + 5) * 3 + 60 + 40
+local FREEPLAY_EXTRA_H = 34  -- extra height for the second button row in free play
+local COUNTDOWN_H      = 28  -- extra height for the daily countdown line
+
+local function frameHeight(len, isDaily)
+    local base = gridHeight(len) + 30 + (KEY_H + 5) * 3 + 60 + COUNTDOWN_H + 40
+    return base + (isDaily and 0 or FREEPLAY_EXTRA_H)
 end
 
 -- ============================================================
@@ -452,7 +463,7 @@ local function rebuildGrid()
     local len = WORD_LENGTH
     local ts  = tileSize(len)
 
-    MainFrame:SetSize(frameWidth(len), frameHeight(len))
+    MainFrame:SetSize(frameWidth(len), frameHeight(len, state.isDaily))
 
     for row = 1, NUM_ROWS do
         if TileFrames[row] then
@@ -558,7 +569,8 @@ local function replaySlot(saved, isDaily)
         end
     elseif state.lost then
         MainFrame.msgText:SetText(
-            "|cffff4444Defeated! The word was: |cffffcc00" .. state.answer .. "|r")
+            "|cffff4444Defeated!|r\n" ..
+            "|cffaaaaaaThe word was|r |cffffcc00" .. saved.answer .. "|r")
     end
 
     return true
@@ -775,20 +787,107 @@ local function submitGuess()
         state.lost = true
         saveProgress()
         recordResult(false, #state.guesses, state.isDaily)
-        if state.isDaily then
-            markDailyCompleted()
-            MainFrame.msgText:SetText(
-                "|cffff4444Defeated! The word was: |cffffcc00" .. state.answer .. "|r")
-        else
-            MainFrame.msgText:SetText(
-                "|cffff4444Defeated! The word was: |cffffcc00" .. state.answer .. "|r")
-        end
+        if state.isDaily then markDailyCompleted() end
+        MainFrame.msgText:SetText(
+            "|cffff4444Defeated!|r\n" ..
+            "|cffaaaaaaThe word was|r |cffffcc00" .. state.answer .. "|r")
     end
 end
 
 -- ============================================================
--- UI BUILDER
+-- CHALLENGE / WORD SHARING
+-- ROT13 is its own inverse so the same function encodes and decodes.
 -- ============================================================
+
+-- Vigenère cipher with fixed key. encode=true encrypts, encode=false decrypts.
+local function vigenere(str, encode)
+    local key    = "WOWDLE"
+    local keyLen = #key
+    local result = {}
+    for i = 1, #str do
+        local c = str:sub(i, i):upper()
+        local b = string.byte(c)
+        if b >= 65 and b <= 90 then
+            local shift = string.byte(key, (i - 1) % keyLen + 1) - 65
+            if encode then
+                table.insert(result, string.char((b - 65 + shift) % 26 + 65))
+            else
+                table.insert(result, string.char((b - 65 - shift + 26) % 26 + 65))
+            end
+        else
+            table.insert(result, c)
+        end
+    end
+    return table.concat(result)
+end
+
+-- Opens a small popup with a pre-filled editbox the player can copy.
+local function showChallengePopup(code)
+    local popup = CreateFrame("Frame", "WoWdleChallengePopup", UIParent, "BackdropTemplate")
+    popup:SetSize(320, 90)
+    popup:SetPoint("CENTER", UIParent, "CENTER")
+    popup:SetFrameStrata("FULLSCREEN_DIALOG")
+    popup:SetFrameLevel(200)
+    popup:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    popup:SetBackdropColor(0.05, 0.05, 0.08, 0.97)
+    popup:SetBackdropBorderColor(0.4, 0.4, 0.5, 1)
+
+    local title = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", popup, "TOP", 0, -12)
+    title:SetText("|cffffcc00Share this challenge with a friend:|r")
+
+    local shareText = "/wowdle play " .. code
+
+    local eb = CreateFrame("EditBox", nil, popup, "InputBoxTemplate")
+    eb:SetSize(280, 24)
+    eb:SetPoint("TOP", title, "BOTTOM", 0, -8)
+    eb:SetText(shareText)
+    eb:SetCursorPosition(0)
+    eb:HighlightText()
+    eb:SetAutoFocus(true)
+    -- Keep text selected and prevent editing.
+    eb:SetScript("OnTextChanged", function(self)
+        self:SetText(shareText)
+        self:HighlightText()
+    end)
+    eb:SetScript("OnEscapePressed", function() popup:Hide() end)
+    eb:SetScript("OnEnterPressed", function() popup:Hide() end)
+
+    local closeBtn = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
+    closeBtn:SetSize(60, 22)
+    closeBtn:SetPoint("BOTTOM", popup, "BOTTOM", 0, 8)
+    closeBtn:SetText("Close")
+    closeBtn:SetScript("OnClick", function() popup:Hide() end)
+end
+
+-- Starts a free play game with a specific challenged word.
+-- Called by /wowdle play CODE.
+local function startChallengeGame(code)
+    local word = vigenere(code:upper(), false)
+    if not ANSWER_SET[word] then
+        print("|cffffcc00WoWdle|r: |cffff4444Invalid challenge code.|r")
+        return
+    end
+    -- Silently replace any in-progress free play game.
+    clearSlot("freeplay")
+    state.answer       = applyWord(word)
+    state.isDaily      = false
+    state.guesses      = {}
+    state.won          = false
+    state.lost         = false
+    state.currentInput = ""
+    rebuildGrid()
+    resetBoard()
+    MainFrame.TitleText:SetText("WoWdle  |cffffcc00– Challenge|r")
+    if refreshModeButtons then refreshModeButtons() end
+    saveProgress()
+    MainFrame:Show()
+    print("|cffffcc00WoWdle|r: Challenge accepted! Good luck!")
+end
 local function createKeyButton(parent, letter, x, y)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(KEY_W, KEY_H)
@@ -830,12 +929,26 @@ end
 
 local function BuildUI()
     MainFrame = CreateFrame("Frame", "WoWdleFrame", UIParent, "BasicFrameTemplateWithInset")
-    MainFrame:SetPoint("CENTER")
     MainFrame:SetMovable(true)
     MainFrame:EnableMouse(true)
     MainFrame:RegisterForDrag("LeftButton")
     MainFrame:SetScript("OnDragStart", MainFrame.StartMoving)
-    MainFrame:SetScript("OnDragStop",  MainFrame.StopMovingOrSizing)
+    MainFrame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        -- Save position so it persists across sessions.
+        local pos = WoWdle_SavedVars.windowPos or {}
+        pos.point, pos.x, pos.y = "TOPLEFT", self:GetLeft(), self:GetTop() - UIParent:GetHeight()
+        WoWdle_SavedVars.windowPos = pos
+    end)
+
+    -- Restore saved position or default to center.
+    local pos = WoWdle_SavedVars and WoWdle_SavedVars.windowPos
+    if pos and pos.point then
+        MainFrame:SetPoint(pos.point, UIParent, pos.point, pos.x, pos.y)
+    else
+        MainFrame:SetPoint("CENTER")
+    end
+
     MainFrame:Hide()
     MainFrame.TitleText:SetText("WoWdle")
 
@@ -847,10 +960,45 @@ local function BuildUI()
     MainFrame.msgText:SetWidth(300)
     MainFrame.msgText:SetText("")
 
+    -- Countdown to next daily reset (midnight local time).
+    local countdownText = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    countdownText:SetPoint("TOP", MainFrame.msgText, "BOTTOM", 0, -4)
+    countdownText:SetWidth(300)
+    countdownText:SetText("")
+    countdownText:SetTextColor(0.7, 0.7, 0.7)
+    MainFrame.countdownText = countdownText
+
+    -- Ticker frame — updates the countdown every second.
+    local tickerFrame = CreateFrame("Frame", nil, MainFrame)
+    local tickAccum   = 0
+    local function updateCountdown()
+        if not state.isDaily then
+            countdownText:SetText("")
+            return
+        end
+        local t    = date("*t")
+        local secs = (23 - t.hour) * 3600 + (59 - t.min) * 60 + (59 - t.sec) + 1
+        local h    = math.floor(secs / 3600)
+        local m    = math.floor((secs % 3600) / 60)
+        local s    = secs % 60
+        countdownText:SetText(string.format(
+            "|cffaaaaaaNext daily in:|r |cffffcc00%02d:%02d:%02d|r", h, m, s))
+    end
+    tickerFrame:SetScript("OnUpdate", function(self, elapsed)
+        tickAccum = tickAccum + elapsed
+        if tickAccum >= 1 then
+            tickAccum = 0
+            updateCountdown()
+        end
+    end)
+    -- Run once immediately so there's no blank frame on first show.
+    updateCountdown()
+    MainFrame.updateCountdown = updateCountdown
+
     local kbFrame = CreateFrame("Frame", nil, MainFrame)
     MainFrame.kbFrame = kbFrame
     kbFrame:SetSize(300, (KEY_H + 5) * 3)
-    kbFrame:SetPoint("TOP", MainFrame.msgText, "BOTTOM", 0, -6)
+    kbFrame:SetPoint("TOP", countdownText, "BOTTOM", 0, -6)
 
     local row1X, row2X, row3X = 2, 16, 30
     buildKeyboardRow(kbFrame, "QWERTYUIOP", row1X, 0)
@@ -902,9 +1050,7 @@ local function BuildUI()
         end
     end)
 
-    -- Bottom buttons: [Switch Mode] [New Word]   [Stats] [Options]
-    --
-    -- Single mode toggle — label always shows the *other* mode so clicking switches to it.
+    -- Bottom button row 1 (always visible): [Mode Toggle]   [Stats] [Options]
     local modeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
     modeBtn:SetSize(90, 24)
     modeBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", 8, 8)
@@ -916,34 +1062,6 @@ local function BuildUI()
         end
     end)
     MainFrame.modeBtn = modeBtn
-
-    -- New Word button (only visible in free play mode)
-    local newWordBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    newWordBtn:SetSize(80, 24)
-    newWordBtn:SetPoint("BOTTOMLEFT", modeBtn, "BOTTOMRIGHT", 4, 0)
-    newWordBtn:SetText("New Word")
-    newWordBtn:SetScript("OnClick", function()
-        -- Only count as skipped if the player actually made at least one guess.
-        if #state.guesses > 0 and not state.won and not state.lost then
-            recordSkip()
-        end
-        clearSlot("freeplay")
-        startFreeGame()
-        saveProgress()
-    end)
-    newWordBtn:Hide()
-    MainFrame.newWordBtn = newWordBtn
-
-    -- Updates the mode toggle label and shows/hides New Word.
-    refreshModeButtons = function()
-        if state.isDaily then
-            modeBtn:SetText("Free Play")
-            newWordBtn:Hide()
-        else
-            modeBtn:SetText("Daily")
-            newWordBtn:Show()
-        end
-    end
 
     local optionsBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
     optionsBtn:SetSize(70, 24)
@@ -973,16 +1091,100 @@ local function BuildUI()
     end)
     MainFrame.statsBtn = statsBtn
 
+    -- Bottom button row 2 (free play only): [New Word] [Challenge]
+    -- Anchored above row 1 so they only take up space when visible.
+    local newWordBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    newWordBtn:SetSize(90, 24)
+    newWordBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", 8, 38)
+    newWordBtn:SetText("New Word")
+    newWordBtn:SetScript("OnClick", function()
+        if #state.guesses > 0 and not state.won and not state.lost then
+            recordSkip()
+        end
+        clearSlot("freeplay")
+        startFreeGame()
+        saveProgress()
+    end)
+    newWordBtn:Hide()
+    MainFrame.newWordBtn = newWordBtn
+
+    local challengeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    challengeBtn:SetSize(90, 24)
+    challengeBtn:SetPoint("BOTTOMLEFT", newWordBtn, "BOTTOMRIGHT", 4, 0)
+    challengeBtn:SetText("Challenge")
+    challengeBtn:SetScript("OnClick", function()
+        showChallengePopup(vigenere(state.answer, true))
+    end)
+    challengeBtn:Hide()
+    MainFrame.challengeBtn = challengeBtn
+
+    -- Challenge code input (row 2, right side)
+    local codeBox = CreateFrame("EditBox", "WoWdleChallengeInput", MainFrame, "InputBoxTemplate")
+    codeBox:SetSize(105, 20)
+    codeBox:SetPoint("BOTTOMLEFT", challengeBtn, "BOTTOMRIGHT", 8, 2)
+    codeBox:SetMaxLetters(8)
+    codeBox:SetAutoFocus(false)
+    codeBox:SetText("")
+    codeBox:Hide()
+    MainFrame.codeBox = codeBox
+
+    local goBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    goBtn:SetSize(30, 24)
+    goBtn:SetPoint("BOTTOMLEFT", codeBox, "BOTTOMRIGHT", 4, -2)
+    goBtn:SetText("Go")
+    goBtn:Hide()
+    MainFrame.goBtn = goBtn
+
+    local function acceptChallengeCode()
+        local code = codeBox:GetText():gsub("%s+", "")
+        if code ~= "" then
+            startChallengeGame(code)
+            codeBox:SetText("")
+        end
+    end
+
+    goBtn:SetScript("OnClick", acceptChallengeCode)
+    codeBox:SetScript("OnEnterPressed", acceptChallengeCode)
+    codeBox:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
+    codeBox:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Enter Challenge Code", 1, 1, 1)
+        GameTooltip:AddLine("Ask a friend to share their Free Play word using the Challenge button. Paste their code here and press Enter or Go to play the same word.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    codeBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Updates mode toggle label, second row visibility, and frame height.
+    refreshModeButtons = function()
+        if state.isDaily then
+            modeBtn:SetText("Free Play")
+            newWordBtn:Hide()
+            challengeBtn:Hide()
+            codeBox:Hide()
+            goBtn:Hide()
+        else
+            modeBtn:SetText("Daily")
+            newWordBtn:Show()
+            challengeBtn:Show()
+            codeBox:Show()
+            goBtn:Show()
+        end
+        MainFrame:SetSize(frameWidth(WORD_LENGTH), frameHeight(WORD_LENGTH, state.isDaily))
+        if MainFrame.updateCountdown then MainFrame.updateCountdown() end
+    end
+
     local function hideGameContent()
         GridFrame:Hide()
         MainFrame.kbFrame:Hide()
         MainFrame.msgText:Hide()
+        MainFrame.countdownText:Hide()
     end
 
     local function showGameContent()
         GridFrame:Show()
         MainFrame.kbFrame:Show()
         MainFrame.msgText:Show()
+        MainFrame.countdownText:Show()
     end
 
     -- ----------------------------------------------------------------
@@ -1085,8 +1287,9 @@ local function BuildUI()
 
     function sp:refreshAndShow()
         local s   = getStats()
-        local pct = s.gamesPlayed > 0
-                    and math.floor(s.gamesWon / s.gamesPlayed * 100)
+        local decisive = s.gamesPlayed - s.gamesSkipped
+        local pct = decisive > 0
+                    and math.floor(s.gamesWon / decisive * 100)
                     or 0
 
         statValues["gamesPlayed"]:SetText(tostring(s.gamesPlayed))
@@ -1212,6 +1415,14 @@ local function BuildUI()
         cb:SetScript("OnClick", function(self)
             getOptions()[optKey] = self:GetChecked()
             refreshCB()
+            -- Apply minimap button visibility immediately.
+            if optKey == "minimapButton" and MinimapBtn then
+                if getOptions().minimapButton then
+                    MinimapBtn:Show()
+                else
+                    MinimapBtn:Hide()
+                end
+            end
         end)
 
         op:HookScript("OnShow", refreshCB)
@@ -1234,11 +1445,97 @@ local function BuildUI()
 end
 
 -- ============================================================
+-- MINIMAP BUTTON
+-- ============================================================
+
+local function BuildMinimapButton()
+    local btn = CreateFrame("Button", "WoWdleMinimapButton", Minimap)
+    btn:SetFrameStrata("MEDIUM")
+    btn:SetWidth(31); btn:SetHeight(31)
+    btn:SetFrameLevel(8)
+    btn:RegisterForClicks("anyUp")
+    btn:RegisterForDrag("LeftButton")
+    btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+
+    -- Border: 53x53, anchored TOPLEFT of button with no offset (LibDBIcon standard)
+    local overlay = btn:CreateTexture(nil, "OVERLAY")
+    overlay:SetWidth(53); overlay:SetHeight(53)
+    overlay:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    overlay:SetPoint("TOPLEFT")
+
+    -- Background: dark circle behind the icon
+    local background = btn:CreateTexture(nil, "BACKGROUND")
+    background:SetWidth(20); background:SetHeight(20)
+    background:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+    background:SetPoint("TOPLEFT", 7, -5)
+
+    -- Icon: TOPLEFT 7,-5 with texcoord trim (LibDBIcon standard)
+    -- INV_Misc_Note_06 is a scroll/paper icon that has existed since vanilla
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    icon:SetWidth(17); icon:SetHeight(17)
+    icon:SetTexture("Interface\\Icons\\INV_Misc_Note_06")
+    icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
+    icon:SetPoint("TOPLEFT", 7, -6)
+
+    -- Positioning: angle saved in SavedVars, default 220 (bottom-right area)
+    local angle = type(WoWdle_SavedVars.minimapAngle) == "number"
+                  and WoWdle_SavedVars.minimapAngle or 220
+    local radius = 105
+
+    local function updatePos()
+        local radian = math.rad(angle)
+        btn:ClearAllPoints()
+        btn:SetPoint("CENTER", Minimap, "CENTER",
+                     math.cos(radian) * radius,
+                     math.sin(radian) * radius)
+    end
+    updatePos()
+
+    btn:SetScript("OnDragStart", function(self)
+        self:SetScript("OnUpdate", function()
+            local mx, my = Minimap:GetCenter()
+            local scale  = UIParent:GetEffectiveScale()
+            local cx, cy = GetCursorPosition()
+            cx, cy = cx / scale, cy / scale
+            angle  = math.deg(math.atan2(cy - my, cx - mx))
+            WoWdle_SavedVars.minimapAngle = angle
+            updatePos()
+        end)
+    end)
+
+    btn:SetScript("OnDragStop", function(self)
+        self:SetScript("OnUpdate", nil)
+    end)
+
+    btn:SetScript("OnClick", function()
+        if MainFrame:IsShown() then
+            MainFrame:Hide()
+        else
+            MainFrame:Show()
+        end
+    end)
+
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("WoWdle")
+        GameTooltip:AddLine("Click to play!", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+
+    btn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    MinimapBtn = btn
+    return btn
+end
+
+-- ============================================================
 -- SLASH COMMAND
 -- ============================================================
 SLASH_WOWDLE1 = "/wowdle"
 SlashCmdList["WOWDLE"] = function(msg)
-    local arg = msg and msg:match("^%s*(%S+)%s*$")
+    local arg, rest = msg and msg:match("^%s*(%S+)%s*(.-)%s*$")
     if arg == "stats" then
         MainFrame:Show()
         MainFrame.optionsPanel:Hide()
@@ -1247,6 +1544,12 @@ SlashCmdList["WOWDLE"] = function(msg)
         MainFrame:Show()
         MainFrame.statsPanel:Hide()
         MainFrame.optionsPanel:Show()
+    elseif arg == "play" then
+        if rest and rest ~= "" then
+            startChallengeGame(rest)
+        else
+            print("|cffffcc00WoWdle|r: Usage: /wowdle play <code>")
+        end
     else
         if MainFrame:IsShown() then
             MainFrame:Hide()
@@ -1264,7 +1567,19 @@ initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     WoWdle_SavedVars = WoWdle_SavedVars or {}
 
+    -- Clear any minimapAngle saved from old broken sessions.
+    -- A valid angle is a number; anything else gets wiped so the default kicks in.
+    if type(WoWdle_SavedVars.minimapAngle) ~= "number" then
+        WoWdle_SavedVars.minimapAngle = nil
+    end
+
     BuildUI()
+    BuildMinimapButton()
+
+    -- Respect the saved minimap button option.
+    if not getOptions().minimapButton then
+        MinimapBtn:Hide()
+    end
 
     -- Try to restore an in-progress game first. If that fails (no save,
     -- stale daily, etc.) fall through to normal daily/free-play startup.
