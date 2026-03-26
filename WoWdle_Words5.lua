@@ -15,7 +15,7 @@ WoWdle_Words[5] = {
 
     -- Named characters & lore figures
     "JAINA", "VELEN", "ELUNE", "UTHER", "MAIEV",
-    "MURKY",
+    "MURKY", "YSERA",
 
     -- Locations & zones
     "NEXUS", "FORGE", "VAULT", "REALM", "ARENA",
@@ -41,7 +41,7 @@ WoWdle_Words[5] = {
     "CHEST", "CRYPT", "ALTAR", "BADGE", "TOKEN",
     "CREST", "RELIC", "AEGIS", "SABER", "CANON",
     "VISOR", "QUILL", "PRISM", "FLASK", "GLOVE",
-    "WAIST", "WRIST",
+    "WAIST", "WRIST", "SWORD",
 
     -- Stats & currencies
     "MAGIC", "POWER", "FOCUS", "HONOR", "VALOR",
@@ -80,3 +80,12 @@ WoWdle_Words[5] = {
     -- The War Within
     "DELVE", "NERUB", "DOKAH",
 }
+
+-- Snapshot the core WoW-only words before any other file can append to WoWdle_Words[5].
+-- WoWdle.lua uses WoWdle_CoreWords to build the daily pool so it stays consistent
+-- regardless of which optional word files the player has installed.
+WoWdle_CoreWords = WoWdle_CoreWords or {}
+WoWdle_CoreWords[5] = {}
+for _, w in ipairs(WoWdle_Words[5]) do
+    table.insert(WoWdle_CoreWords[5], w)
+end

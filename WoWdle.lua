@@ -51,7 +51,6 @@ local DAILY_POOL     = {}   -- fixed 5-letter WoW-only words; never changes with
 do
     for _, w in ipairs(loadAndValidate(5)) do
         table.insert(WORDS, w)
-        table.insert(DAILY_POOL, w)
         ANSWER_SET[w] = true
     end
     for _, w in ipairs(loadAndValidate(6)) do
@@ -65,6 +64,31 @@ do
     for _, w in ipairs(loadBlizzardWords(6)) do
         table.insert(BLIZZARD_WORDS, w)
         ANSWER_SET[w] = true
+    end
+
+    -- Build DAILY_POOL from the core WoW-only snapshot taken before any
+    -- Blizzard word files could append to WoWdle_Words[5]. This guarantees
+    -- all players get the same daily word regardless of which optional files
+    -- they have installed.
+    local coreSource = WoWdle_CoreWords and WoWdle_CoreWords[5]
+    if coreSource then
+        local seen = {}
+        for _, w in ipairs(coreSource) do
+            w = w:upper()
+            if #w == 5 and not seen[w] then
+                seen[w] = true
+                table.insert(DAILY_POOL, w)
+            end
+        end
+    else
+        -- Fallback: WoWdle_Words5.lua is an older version without the snapshot.
+        -- Use loadAndValidate result but warn the player.
+        print("|cffffcc00WoWdle|r: |cffff4444WoWdle_Words5.lua is outdated. "
+              .. "Daily word may differ between players. Please update.|r")
+        for _, w in ipairs(DAILY_POOL) do end -- already empty, fill from WORDS
+        for _, w in ipairs(WORDS) do
+            if #w == 5 then table.insert(DAILY_POOL, w) end
+        end
     end
 end
 
@@ -302,7 +326,7 @@ local KeyButtons = {}
 -- LAYOUT
 -- ============================================================
 local FRAME_PADDING = 20
-local MAX_GRID_W    = 300
+local MAX_GRID_W    = 320
 local TILE_GAP      = 6
 local NUM_ROWS      = 6
 local KEY_W         = 28
@@ -352,9 +376,15 @@ local RARITY_COLORS = {
     [6] = {0.62, 0.62, 0.62, 1},
 }
 
--- ============================================================
--- HELPERS
--- ============================================================
+-- Returns the faction-appropriate victory exclamation.
+local function factionCheer()
+    local faction = UnitFactionGroup and UnitFactionGroup("player")
+    if faction == "Alliance" then
+        return "|cff00ccffFor the Alliance!|r"
+    else
+        return "|cff00ff7fFor the Horde!|r"
+    end
+end
 local function randomWord()
     local pool = activePool()
     return pool[math.random(1, #pool)]
@@ -562,10 +592,10 @@ local function replaySlot(saved, isDaily)
         if isDaily then
             local noun = #state.guesses == 1 and "guess" or "guesses"
             MainFrame.msgText:SetText(
-                "|cff00ff7fFor the Horde! Daily word solved in " ..
-                #state.guesses .. " " .. noun .. "!|r")
+                factionCheer() .. " Daily word solved in " ..
+                #state.guesses .. " " .. noun .. "!")
         else
-            MainFrame.msgText:SetText("|cff00ff7fFor the Horde! You got it!|r")
+            MainFrame.msgText:SetText(factionCheer() .. " You got it!")
         end
     elseif state.lost then
         MainFrame.msgText:SetText(
@@ -778,10 +808,10 @@ local function submitGuess()
             markDailyCompleted()
             local noun = #state.guesses == 1 and "guess" or "guesses"
             MainFrame.msgText:SetText(
-                "|cff00ff7fFor the Horde! Daily word solved in " ..
-                #state.guesses .. " " .. noun .. "!|r")
+                factionCheer() .. " Daily word solved in " ..
+                #state.guesses .. " " .. noun .. "!")
         else
-            MainFrame.msgText:SetText("|cff00ff7fFor the Horde! You got it!|r")
+            MainFrame.msgText:SetText(factionCheer() .. " You got it!")
         end
     elseif #state.guesses >= state.maxGuesses then
         state.lost = true
@@ -997,7 +1027,7 @@ local function BuildUI()
 
     local kbFrame = CreateFrame("Frame", nil, MainFrame)
     MainFrame.kbFrame = kbFrame
-    kbFrame:SetSize(300, (KEY_H + 5) * 3)
+    kbFrame:SetSize(320, (KEY_H + 5) * 3)
     kbFrame:SetPoint("TOP", countdownText, "BOTTOM", 0, -6)
 
     local row1X, row2X, row3X = 2, 16, 30
@@ -1091,10 +1121,10 @@ local function BuildUI()
     end)
     MainFrame.statsBtn = statsBtn
 
-    -- Bottom button row 2 (free play only): [New Word] [Challenge]
-    -- Anchored above row 1 so they only take up space when visible.
+    -- Bottom button row 2 (free play only): [New Word] [Challenge]  on left
+    --                                        [____code____] [Go]     on right
     local newWordBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    newWordBtn:SetSize(90, 24)
+    newWordBtn:SetSize(80, 24)
     newWordBtn:SetPoint("BOTTOMLEFT", MainFrame, "BOTTOMLEFT", 8, 38)
     newWordBtn:SetText("New Word")
     newWordBtn:SetScript("OnClick", function()
@@ -1109,7 +1139,7 @@ local function BuildUI()
     MainFrame.newWordBtn = newWordBtn
 
     local challengeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    challengeBtn:SetSize(90, 24)
+    challengeBtn:SetSize(80, 24)
     challengeBtn:SetPoint("BOTTOMLEFT", newWordBtn, "BOTTOMRIGHT", 4, 0)
     challengeBtn:SetText("Challenge")
     challengeBtn:SetScript("OnClick", function()
@@ -1118,22 +1148,22 @@ local function BuildUI()
     challengeBtn:Hide()
     MainFrame.challengeBtn = challengeBtn
 
-    -- Challenge code input (row 2, right side)
+    -- Code input and Go button anchored from the RIGHT so they don't overflow
+    local goBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
+    goBtn:SetSize(30, 24)
+    goBtn:SetPoint("BOTTOMRIGHT", MainFrame, "BOTTOMRIGHT", -8, 38)
+    goBtn:SetText("Go")
+    goBtn:Hide()
+    MainFrame.goBtn = goBtn
+
     local codeBox = CreateFrame("EditBox", "WoWdleChallengeInput", MainFrame, "InputBoxTemplate")
-    codeBox:SetSize(105, 20)
-    codeBox:SetPoint("BOTTOMLEFT", challengeBtn, "BOTTOMRIGHT", 8, 2)
+    codeBox:SetSize(80, 20)
+    codeBox:SetPoint("BOTTOMRIGHT", goBtn, "BOTTOMLEFT", -4, 2)
     codeBox:SetMaxLetters(8)
     codeBox:SetAutoFocus(false)
     codeBox:SetText("")
     codeBox:Hide()
     MainFrame.codeBox = codeBox
-
-    local goBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-    goBtn:SetSize(30, 24)
-    goBtn:SetPoint("BOTTOMLEFT", codeBox, "BOTTOMRIGHT", 4, -2)
-    goBtn:SetText("Go")
-    goBtn:Hide()
-    MainFrame.goBtn = goBtn
 
     local function acceptChallengeCode()
         local code = codeBox:GetText():gsub("%s+", "")
