@@ -704,7 +704,6 @@ resetBoard = function()
     end
     if InputBox then
         InputBox:SetText("")
-        InputBox:SetFocus()
     end
 end
 
@@ -1040,7 +1039,7 @@ local function BuildUI()
     enterBtn:SetPoint("TOPLEFT", kbFrame, "TOPLEFT",
                       row3X + 7 * (KEY_W + 4) + 4, -(KEY_H + 5) * 2)
     enterBtn:SetText("ENTER")
-    enterBtn:SetScript("OnClick", function() submitGuess(); InputBox:SetFocus() end)
+    enterBtn:SetScript("OnClick", function() submitGuess() end)
 
     local bsBtn = CreateFrame("Button", nil, kbFrame, "UIPanelButtonTemplate")
     bsBtn:SetSize(36, KEY_H)
@@ -1051,7 +1050,6 @@ local function BuildUI()
             state.currentInput = state.currentInput:sub(1, -2)
             updateCurrentRowDisplay()
         end
-        InputBox:SetFocus()
     end)
 
     InputBox = CreateFrame("EditBox", "WoWdleInputBox", MainFrame)
@@ -1069,7 +1067,7 @@ local function BuildUI()
     end)
 
     InputBox:SetScript("OnEnterPressed", function()
-        submitGuess(); InputBox:SetFocus()
+        submitGuess()
     end)
 
     InputBox:SetScript("OnKeyDown", function(self, key)
@@ -1466,8 +1464,10 @@ local function BuildUI()
 
     MainFrame.optionsPanel = op
 
-    MainFrame:SetScript("OnShow", function() InputBox:SetFocus() end)
+    MainFrame:SetScript("OnShow", function() end)  -- do not steal focus on open
+    MainFrame:SetScript("OnMouseDown", function() InputBox:SetFocus() end)
     MainFrame:SetScript("OnHide", function()
+        InputBox:ClearFocus()
         sp:Hide()
         op:Hide()
         showGameContent()

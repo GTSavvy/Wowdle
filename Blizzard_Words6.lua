@@ -45,7 +45,6 @@ local _bliz6 = {
 
     -- Buildings & structures
     "BUNKER",   -- Terran static defense structure
-    "ARMORY",   -- Terran upgrade building (vehicle/ship weapons)
 
     -- Characters
     "RAYNOR",   -- Jim Raynor — Terran protagonist across all SC games
@@ -68,10 +67,12 @@ local _bliz6 = {
     -- DIABLO  (I, II, III, IV, Immortal)
     -- ============================================================
 
+    -- Classes
+    "WIZARD",   -- Wizard — elemental mage class in D3, Diablo Immortal, and D4
+
     -- Characters & major lore figures
     "TYRAEL",   -- Tyrael — Archangel of Justice; recurring protagonist
     "DIABLO",   -- The Prime Evil, Lord of Terror; namesake of the series
-    "LEORIC",   -- King Leoric — the Skeleton King; D2 & D3 boss
     "ZOLTUN",   -- Zoltun Kulle — rogue Horadrim mage; D3 Act II
     "LILITH",   -- Lilith — Daughter of Mephisto; Diablo IV main villain
     "CYDAEA",   -- Cydaea — Maiden of Lust; D3 Act III boss
@@ -85,22 +86,10 @@ local _bliz6 = {
 
     -- Monsters & enemy types
     "FALLEN",   -- Fallen — iconic imp-like enemy since D1
-    "ZOMBIE",   -- Zombie — D1/D3 undead enemy
-    "WRAITH",   -- Wraith — spectral undead enemy type
-    "SAVAGE",   -- Savage beast enemy type
-    "WARDEN",   -- Warden / Dungeon Warden enemy (D4)
-    "HERALD",   -- Herald of Pestilence — D3 Reaper of Souls enemy
     "LACUNI",   -- Lacuni — panther-like panther enemy (D3 Act II)
-    "PLAGUE",   -- Plague — enemy affix and zone theme
 
     -- Items, gear & mechanics
-    "SCYTHE",   -- Scythe — core Necromancer weapon type
-    "AMULET",   -- Amulet — neck slot gear across all Diablo games
-    "PORTAL",   -- Town Portal — foundational Diablo mechanic
     "SHRINE",   -- Shrine — interactable buff object in all Diablo games
-    "SOCKET",   -- Socket — item modification system
-    "QUIVER",   -- Quiver — Demon Hunter off-hand slot (D3)
-    "SEASON",   -- Season — timed ladder content cycle
     "PRIMAL",   -- Primal Ancient — highest item tier in D3
     "MANTRA",   -- Mantra — Monk ability category (D3)
     "SIGNET",   -- Signet ring — item type (D2 / D4)
@@ -120,26 +109,18 @@ local _bliz6 = {
     -- ============================================================
 
     -- Characters & famous cards
-    "HAKKAR",   -- Hakkar the Soulflayer — Rastakhan's Rumble legendary
     "FINLEY",   -- Sir Finley Mrrgglton / Finley of the Frogs — murloc explorer
 
     -- Keywords & mechanics
-    "DIVINE",   -- Divine Shield — evergreen HS keyword
     "FREEZE",   -- Freeze — mechanic / keyword (Mage)
     "POISON",   -- Poisonous — keyword (kills any minion it damages)
-    "CHARGE",   -- Charge — legacy evergreen keyword
     "INFUSE",   -- Infuse — Murder at Castle Nathria keyword
     "REBORN",   -- Reborn — Saviors of Uldum keyword (revives at 1 HP)
     "DREDGE",   -- Dredge — Voyage to the Sunken City keyword
     "LACKEY",   -- Lackey tokens — Descent of Dragons mechanic
     "INVOKE",   -- Invoke — Descent of Dragons / Galakrond keyword
-    "SECRET",   -- Secret — trap card type; iconic HS mechanic
 
     -- Expansions & sets
-    "UNGORO",   -- Journey to Un'Goro — HS expansion (2017)
-    "GADGET",   -- Mean Streets of Gadgetzan — HS expansion (2016)
-    "SUNKEN",   -- Voyage to the Sunken City — HS expansion (2022)
-    "TANAAN",   -- Tanaan Jungle — WoW zone referenced in HS cards
     "TITANS",   -- TITANS — HS expansion (2023)
     "MURDER",   -- Murder at Castle Nathria — HS expansion (2022)
     "VOYAGE",   -- Voyage to the Sunken City — HS expansion shorthand
@@ -150,14 +131,10 @@ local _bliz6 = {
     -- ============================================================
 
     -- Heroes (6-letter names)
-    "LEORIC",   -- Leoric the Skeleton King — Diablo crossover
     "ALARAK",   -- Alarak — StarCraft crossover (already in SC section)
-    "LUNARA",   -- Lunara — Night Elf dryad hero (original HotS lore)
     "ZAGARA",   -- Zagara — StarCraft crossover (already in SC section)
     "DEHAKA",   -- Dehaka — StarCraft crossover (already in SC section)
     "CASSIA",   -- Cassia — Amazon hero; Diablo II crossover in HotS
-    "SAMURO",   -- Samuro — Blademaster; WC3 crossover in HotS
-    "REXXAR",   -- Rexxar — Beastmaster; WC3/WoW/HS crossover in HotS
 
     -- ============================================================
     -- WARCRAFT III  (RTS era, pre-WoW)
@@ -165,7 +142,6 @@ local _bliz6 = {
 
     -- Units & hero types
     "KEEPER",   -- Keeper of the Grove — Night Elf hero unit (WC3)
-    "KNIGHT",   -- Knight — Paladin-class mounted Human cavalry (WC3)
     "MORTAR",   -- Mortar Team — Dwarven artillery unit (WC3)
     "COUATL",   -- Couatl — Night Elf flying support unit (WC3)
 

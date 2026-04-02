@@ -25,7 +25,7 @@ WoWdle_Words[6] = {
 
     -- Dungeons & raids
     "MOLTEN", "UTGARD", "VIOLET", "THRONE", "SCHOLO",
-    "STRATH", "LEGION", "DELVES",
+    "STRATH", "LEGION",
 
     -- Creatures & mobs
     "MURLOC", "KOBOLD", "WRAITH", "VRYKUL", "DRAGON",
@@ -70,6 +70,27 @@ WoWdle_Words[6] = {
     -- Dragonflight bosses
     "FYRAKK", "RASHOK", "ZSKARN",
 
+    -- The War Within
+    "SUREKI",   -- TWW — nerubian spider sub-faction in Azj-Kahet
+    "ALGARI",   -- TWW — demonym for Khaz Algar inhabitants; used throughout TWW
+    "HOGGER",   -- Hogger — infamous vanilla WoW gnoll boss; Warcraft Rumble leader
+
+    -- Midnight
+    "FUNGAL",   -- Harandar is a bioluminescent fungal jungle biome
+    "ARATOR",   -- Arator the Redeemed; leads the March on Quel'Danas raid
+
+    -- Moved from Blizzard list (WoW-origin or strongly WoW-associated)
+    "SCYTHE",   -- Scythe of Elune; iconic WoW artifact; Death Knight weapon type
+    "PLAGUE",   -- Plague — Plaguelands, Plague of Undeath, Scourge; core WoW lore
+    "HERALD",   -- Herald of the Titans; iconic WoW achievement and title
+    "DIVINE",   -- Divine Shield; core WoW Paladin ability since vanilla
+    "SECRET",   -- Secret; Hunter/Mage/Paladin trap mechanic; core WoW ability type
+    "KNIGHT",   -- Knight — Death Knight, Blood Knight; central WoW class and lore
+    "REXXAR",   -- Rexxar — Beastmaster; WoW character in Outland and beyond
+    "SEASON",   -- Season — WoW Mythic+ and PvP seasons; core modern WoW system
+    "LEORIC",   -- King Leoric — WoW Scarlet Monastery boss; WoW origin before Diablo 3
+    "LUNARA",   -- Lunara — WoW dryad character; appears in Legion and later
+    "SAMURO",   -- Samuro — Blademaster; WC3 character with WoW story presence
 }
 
 -- Snapshot the core WoW-only words before any other file can append to WoWdle_Words[6].

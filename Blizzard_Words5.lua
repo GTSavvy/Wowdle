@@ -30,7 +30,6 @@ local _bliz5 = {
 
     -- Factions & lore
     "OMNIC",    -- Sentient robot race at the heart of the Crisis
-    "TALON",    -- Terrorist villain organization
     "HELIX",    -- Helix Security International — OW lore faction
 
     -- Maps & locations
@@ -42,9 +41,6 @@ local _bliz5 = {
 
     -- Abilities & mechanics
     "PULSE",    -- Pulse Bomb — Tracer's ultimate
-    "RALLY",    -- Rally — Brigitte's ultimate
-    "BLADE",    -- Dragonblade — Genji's ultimate
-    "VISOR",    -- Tactical Visor — Soldier: 76's ultimate
     "VENOM",    -- Venom Mine — Widowmaker ability
     "EMOTE",    -- Cosmetic emote system across all Blizzard titles
 
@@ -63,17 +59,12 @@ local _bliz5 = {
     "MEDIC",    -- Terran support unit (SC1 / SCR)
     "SCOUT",    -- Protoss air unit (SC1 / SCR)
     "PROBE",    -- Protoss worker unit
-    "HYDRA",    -- Hydralisk — community shorthand
     "ULTRA",    -- Ultralisk — community shorthand
     "ROACH",    -- Zerg ranged armored ground unit
-    "VIPER",    -- Zerg high-tech flying caster (SC2 HotS+)
-    "RAVEN",    -- Terran mechanical support unit (SC2)
     "ADEPT",    -- Protoss mobile ranged unit (SC2 LotV)
 
     -- Buildings & structures
-    "NEXUS",    -- Protoss command center / HotS hub world
     "PYLON",    -- Protoss power/supply structure
-    "FORGE",    -- Protoss upgrade building
     "DEPOT",    -- Supply Depot — Terran supply building
     "SPORE",    -- Spore Crawler — Zerg anti-air static defense
 
@@ -83,7 +74,6 @@ local _bliz5 = {
     "SPINE",    -- Spine Crawler — Zerg anti-ground static defense
     "NYDUS",    -- Nydus Worm / Nydus Canal transport network
     "MORPH",    -- Zerg & Protoss transformation mechanic
-    "MACRO",    -- Macro play — economy and production management
     "MICRO",    -- Micro play — individual unit control skill
 
     -- Characters
@@ -105,17 +95,15 @@ local _bliz5 = {
     -- Monsters & enemy types
     "LEECH",    -- Blood Leech / Cave Leech enemy (D2)
     "FETCH",    -- Fetish enemy type — jungle creatures (D3 Act III)
-    "SHADE",    -- Shade / Shadow Warrior enemy
-    "SKULL",    -- Skull enemy / ubiquitous item and environmental motif
 
     -- Items & game mechanics
-    "CACHE",    -- Nephalem Cache / Horadric Cache — loot reward
     "GRIFT",    -- Greater Rift — D3 timed endgame dungeon
-    "ELITE",    -- Elite monster tier — yellow/blue champion enemies
     "TOPAZ",    -- Topaz gem — used across all Diablo games
     "TRAIT",    -- Trait — character progression node (D4)
     "FACET",    -- Jewel Facet — D2 gem type socketed into gear
     "MIGHT",    -- Might of the Earth — D3 Barbarian set / stat theme
+    "RIFTS",    -- Nephalem Rifts — the central D3/Diablo Immortal endgame loop
+    "KANAI",    -- Kanai's Cube — the iconic D3 legendary power extraction system
 
     -- Locations
     "ULDUR",    -- Uldur's Cave — stronghold area in Diablo IV
@@ -125,17 +113,12 @@ local _bliz5 = {
     -- ============================================================
 
     -- Characters & famous cards
-    "YSERA",    -- Ysera — Dragon Aspect legendary (Dream)
     "ELISE",    -- Elise Starseeker / Elise the Trailblazer
-    "BRANN",    -- Brann Bronzebeard — Battlecry-doubling legendary
     "MORGL",    -- Morgl the Oracle — murloc shaman hero skin
-    "CTHUN",    -- C'Thun — Old God legendary (Whispers of the Old Gods)
     "NZOTH",    -- N'Zoth the Corruptor — Old God legendary
-    "HEMET",    -- Hemet Nesingwary — WoW/HS explorer character
     "ZEREK",    -- Zerek, Master Cloner — HS card (The Boomsday Project)
 
     -- Keywords & mechanics
-    "TAUNT",    -- Taunt — evergreen HS keyword
     "SPELL",    -- Spell — core HS card type
     "COMBO",    -- Combo — Rogue mechanic keyword
     "JOUST",    -- Joust — The Grand Tournament keyword
@@ -143,7 +126,6 @@ local _bliz5 = {
     "BRAWL",    -- Tavern Brawl — weekly HS game mode
 
     -- Expansions & sets
-    "ASHES",    -- Ashes of Outland — HS expansion (2020)
     "MARCH",    -- March of the Lich King — HS expansion (2022)
     "TWIST",    -- Twist — rotating HS format with special rules
 
@@ -165,13 +147,10 @@ local _bliz5 = {
     -- ============================================================
 
     -- Units & heroes
-    "GRUNT",    -- Grunt — Orc front-line melee unit (WC2/WC3)
-    "DRYAD",    -- Dryad — Night Elf ranged support unit (WC3)
 
     -- ============================================================
     -- SHARED / CROSS-BLIZZARD
     -- ============================================================
-    "STORM",    -- Heroes of the Storm / "Into the Storm" / countless references
 }
 
 -- Merge into the Blizzard word pool; WoWdle.lua deduplicates on load.

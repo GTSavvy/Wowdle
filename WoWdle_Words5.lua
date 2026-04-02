@@ -15,7 +15,7 @@ WoWdle_Words[5] = {
 
     -- Named characters & lore figures
     "JAINA", "VELEN", "ELUNE", "UTHER", "MAIEV",
-    "MURKY", "YSERA",
+    "MURKY",
 
     -- Locations & zones
     "NEXUS", "FORGE", "VAULT", "REALM", "ARENA",
@@ -41,7 +41,7 @@ WoWdle_Words[5] = {
     "CHEST", "CRYPT", "ALTAR", "BADGE", "TOKEN",
     "CREST", "RELIC", "AEGIS", "SABER", "CANON",
     "VISOR", "QUILL", "PRISM", "FLASK", "GLOVE",
-    "WAIST", "WRIST", "SWORD",
+    "WAIST", "WRIST",
 
     -- Stats & currencies
     "MAGIC", "POWER", "FOCUS", "HONOR", "VALOR",
@@ -79,6 +79,26 @@ WoWdle_Words[5] = {
 
     -- The War Within
     "DELVE", "NERUB", "DOKAH",
+    "RUNIC",    -- TWW — earthen rune magic and titan machinery throughout Khaz Algar
+    "SNEED",    -- Sneed (and his Shredder) — WoW UBRS boss; beloved meme; Warcraft Rumble leader
+
+    -- Midnight
+    "AMANI",    -- Amani troll clan; Zul'Aman is a core Midnight zone
+    "ELVEN",    -- Blood Elves are the central race of the Midnight expansion
+    "FUNGI",    -- Harandar is a bioluminescent fungal jungle biome
+    "CROWN",    -- Crown of the Cosmos; final boss of the Voidspire raid
+
+    -- Moved from Blizzard list (WoW-origin or strongly WoW-associated)
+    "YSERA",    -- Dragon Aspect of Dreams; major WoW character in Cataclysm and Legion
+    "BRANN",    -- Brann Bronzebeard; iconic WoW explorer since vanilla; TWW delve companion
+    "HEMET",    -- Hemet Nesingwary; famous WoW hunter NPC since vanilla
+    "GRUNT",    -- Horde grunt; front-line Warcraft unit since WC1; common WoW enemy
+    "ASHES",    -- Ashes of Al'ar; one of the most iconic WoW mount drops ever
+    "DRYAD",    -- Cenarion dryad; WoW creature since vanilla and WC3
+    "MACRO",    -- Macro; core WoW gameplay feature every player uses
+    "SKULL",    -- Skull marker; iconic WoW raid target symbol
+    "ELITE",    -- Elite mob; core WoW difficulty rating since vanilla
+    "CACHE",    -- Cache; treasure caches; very common modern WoW term
 }
 
 -- Snapshot the core WoW-only words before any other file can append to WoWdle_Words[5].
